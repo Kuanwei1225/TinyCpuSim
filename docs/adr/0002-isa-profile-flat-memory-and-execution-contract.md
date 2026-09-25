@@ -1,0 +1,3 @@
+# 0002 16/32-Bit Mixed ISA, Flat Physical Memory, and Architectural State Isolation
+
+We adopt a 16/32-bit mixed instruction set (ARMv7-M / Thumb-2 style decoding) operating in a single flat physical memory space without MMU/virtual memory translation or dynamic library linking. Self-test programs terminate deterministically via `SVC` with exit code passed in register `R0`. The core design strictly isolates `ArchitecturalState` (committed registers R0-R15 + CPSR) from execution engines, establishing a clean contract for subsequent Out-of-Order (OoO) pipeline integration and speculative mispredict flushes.

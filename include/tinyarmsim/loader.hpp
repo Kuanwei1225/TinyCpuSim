@@ -1,0 +1,107 @@
+#pragma once
+
+#include <cstdint>
+#include <istream>
+#include <vector>
+#include <cstring>
+#include <stdexcept>
+#include "tinyarmsim/state.hpp"
+#include "tinyarmsim/memory_bus.hpp"
+
+namespace tinyarmsim {
+
+class LoaderException : public std::runtime_error {
+public:
+    explicit LoaderException(const std::string& message)
+        : std::runtime_error("Loader error: " + message) {}
+};
+
+class Loader {
+public:
+    static void load_raw(std::istream& stream, MemoryBus& bus, uint32_t base_address) {
+        std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(stream)),
+                                     std::istreambuf_iterator<char>());
+        for (size_t i = 0; i < buffer.size(); ++i) {
+            bus.write8(base_address + static_cast<uint32_t>(i), buffer[i]);
+        }
+    }
+
+    static void load_elf(std::istream& stream, MemoryBus& bus, ArchitecturalState& state) {
+        std::vector<uint8_t> data((std::istreambuf_iterator<char>(stream)),
+                                  std::istreambuf_iterator<char>());
+
+        if (data.size() < 52) {
+            throw LoaderException("File too small to be an ELF32 executable");
+        }
+
+        // Validate Magic: 0x7F 'E' 'L' 'F'
+        if (data[0] != 0x7F || data[1] != 'E' || data[2] != 'L' || data[3] != 'F') {
+            throw LoaderException("Invalid ELF magic number");
+        }
+
+        // Validate 32-bit (EI_CLASS == 1) and Little Endian (EI_DATA == 1)
+        if (data[4] != 1) {
+            throw LoaderException("Only 32-bit ELF binaries are supported");
+        }
+        if (data[5] != 1) {
+            throw LoaderException("Only Little-Endian ELF binaries are supported");
+        }
+
+        uint16_t e_machine;
+        std::memcpy(&e_machine, &data[18], 2);
+        if (e_machine != 40) { // EM_ARM = 40 (0x28)
+            throw LoaderException("ELF architecture is not ARM (EM_ARM)");
+        }
+
+        uint32_t e_entry;
+        uint32_t e_phoff;
+        uint16_t e_phentsize;
+        uint16_t e_phnum;
+
+        std::memcpy(&e_entry, &data[24], 4);
+        std::memcpy(&e_phoff, &data[28], 4);
+        std::memcpy(&e_phentsize, &data[42], 2);
+        std::memcpy(&e_phnum, &data[44], 2);
+
+        // Load segments
+        for (uint16_t i = 0; i < e_phnum; ++i) {
+            size_t ph_offset = e_phoff + (i * e_phentsize);
+            if (ph_offset + e_phentsize > data.size()) {
+                throw LoaderException("Program header table exceeds file size");
+            }
+
+            uint32_t p_type;
+            uint32_t p_offset;
+            uint32_t p_vaddr;
+            uint32_t p_filesz;
+            uint32_t p_memsz;
+
+            std::memcpy(&p_type, &data[ph_offset + 0], 4);
+            std::memcpy(&p_offset, &data[ph_offset + 4], 4);
+            std::memcpy(&p_vaddr, &data[ph_offset + 8], 4);
+            std::memcpy(&p_filesz, &data[ph_offset + 16], 4);
+            std::memcpy(&p_memsz, &data[ph_offset + 20], 4);
+
+            if (p_type == 1) { // PT_LOAD
+                if (p_offset + p_filesz > data.size()) {
+                    throw LoaderException("PT_LOAD segment data exceeds file size");
+                }
+
+                // Copy payload from file
+                for (uint32_t b = 0; b < p_filesz; ++b) {
+                    bus.write8(p_vaddr + b, data[p_offset + b]);
+                }
+
+                // Zero-fill remaining BSS (p_memsz - p_filesz)
+                for (uint32_t b = p_filesz; b < p_memsz; ++b) {
+                    bus.write8(p_vaddr + b, 0);
+                }
+            }
+        }
+
+        // Set entry point (mask out bit 0 for Thumb entry addresses)
+        state.set_pc(e_entry & ~1u);
+    }
+};
+
+} // namespace tinyarmsim
