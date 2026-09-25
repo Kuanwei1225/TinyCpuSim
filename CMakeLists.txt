@@ -135,5 +135,11 @@ add_executable(coherence_test tests/uarch/coherence_test.cpp)
 target_link_libraries(coherence_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(coherence_test)
 
+# uArch Phase 1 Cache Speedup and MESI Demo Test
+add_executable(cache_speedup_demo_test tests/uarch/cache_speedup_demo_test.cpp)
+target_link_libraries(cache_speedup_demo_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(cache_speedup_demo_test)
+
+
 
 
