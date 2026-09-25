@@ -159,6 +159,19 @@ public:
             }
         }
 
+        // 5.5 Load literal (PC-relative load): [15:11] == 01001 (0x4800 - 0x4FFF)
+        if ((raw_instr & 0xF800) == 0x4800) {
+            uint8_t rd = static_cast<uint8_t>((raw_instr >> 8) & 0x7);
+            uint32_t imm8 = raw_instr & 0xFF;
+            instr.op = Opcode::LDR;
+            instr.rd = rd;
+            instr.rn = 15; // PC
+            instr.is_imm = true;
+            instr.imm = imm8 * 4;
+            instr.mem_size = 4;
+            return instr;
+        }
+
         // 6. Load/Store register offset: [15:12] == 0101 (0x5000 - 0x5FFF)
         if ((raw_instr & 0xF000) == 0x5000) {
             uint8_t op3 = static_cast<uint8_t>((raw_instr >> 9) & 0x7);
@@ -359,7 +372,7 @@ public:
         }
 
         // 2. 32-bit Data Processing (modified register / shifted): [15:9] == 1110101 (0xEA00/0xEB00)
-        if ((w1 & 0xEE00) == 0xEA00) {
+        if ((w1 & 0xFE00) == 0xEA00) {
             uint8_t op4 = static_cast<uint8_t>((w1 >> 5) & 0xF);
             bool set_flags = ((w1 >> 4) & 0x1) != 0;
             uint8_t rn = static_cast<uint8_t>(w1 & 0xF);

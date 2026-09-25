@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <string>
 
 namespace tinyarmsim {
 
@@ -57,6 +58,59 @@ enum class Opcode {
     SVC,
     NOP
 };
+
+[[nodiscard]] constexpr std::string_view opcode_to_string(Opcode op) noexcept {
+    switch (op) {
+        case Opcode::MOV: return "MOV";
+        case Opcode::MVN: return "MVN";
+        case Opcode::MOVT: return "MOVT";
+        case Opcode::MOVW: return "MOVW";
+        case Opcode::ADD: return "ADD";
+        case Opcode::ADC: return "ADC";
+        case Opcode::SUB: return "SUB";
+        case Opcode::SBC: return "SBC";
+        case Opcode::RSB: return "RSB";
+        case Opcode::MUL: return "MUL";
+        case Opcode::MLA: return "MLA";
+        case Opcode::AND: return "AND";
+        case Opcode::ORR: return "ORR";
+        case Opcode::EOR: return "EOR";
+        case Opcode::BIC: return "BIC";
+        case Opcode::CMP: return "CMP";
+        case Opcode::CMN: return "CMN";
+        case Opcode::TST: return "TST";
+        case Opcode::TEQ: return "TEQ";
+        case Opcode::ASR: return "ASR";
+        case Opcode::LSL: return "LSL";
+        case Opcode::LSR: return "LSR";
+        case Opcode::ROR: return "ROR";
+        case Opcode::B: return "B";
+        case Opcode::BL: return "BL";
+        case Opcode::BX: return "BX";
+        case Opcode::BLX: return "BLX";
+        case Opcode::CBZ: return "CBZ";
+        case Opcode::CBNZ: return "CBNZ";
+        case Opcode::LDR: return "LDR";
+        case Opcode::LDRB: return "LDRB";
+        case Opcode::LDRH: return "LDRH";
+        case Opcode::LDRSB: return "LDRSB";
+        case Opcode::LDRSH: return "LDRSH";
+        case Opcode::STR: return "STR";
+        case Opcode::STRB: return "STRB";
+        case Opcode::STRH: return "STRH";
+        case Opcode::LDM: return "LDM";
+        case Opcode::STM: return "STM";
+        case Opcode::PUSH: return "PUSH";
+        case Opcode::POP: return "POP";
+        case Opcode::MRS: return "MRS";
+        case Opcode::MSR: return "MSR";
+        case Opcode::SVC: return "SVC";
+        case Opcode::NOP: return "NOP";
+        case Opcode::UNKNOWN:
+        default:
+            return "UNKNOWN";
+    }
+}
 
 enum class ConditionCode : uint8_t {
     EQ = 0b0000, // Equal (Z == 1)

@@ -37,3 +37,7 @@ TEST_F(AssemblySelfTest, ExecuteFibonacciAssemblySelfTest) {
 TEST_F(AssemblySelfTest, ExecuteSortAssemblySelfTest) {
     run_elf_fixture("tests/fixtures/test_sort.elf", 0);
 }
+
+TEST_F(AssemblySelfTest, ExecuteIsaCoverageAssemblySelfTest) {
+    run_elf_fixture("tests/fixtures/test_isa_coverage.elf", 0);
+}

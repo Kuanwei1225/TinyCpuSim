@@ -1,6 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <chrono>
+#include <iostream>
+#include <iomanip>
+#include <unordered_map>
+#include <fstream>
 #include "tinyarmsim/state.hpp"
 #include "tinyarmsim/memory_bus.hpp"
 #include "tinyarmsim/instruction.hpp"
@@ -9,10 +14,33 @@
 
 namespace tinyarmsim {
 
+struct SimulationStats {
+    uint64_t instruction_count{0};
+    double elapsed_seconds{0.0};
+    double instructions_per_second{0.0};
+    std::unordered_map<Opcode, uint64_t> opcode_counts;
+};
+
 class IsaInterpreter {
 public:
     IsaInterpreter(ArchitecturalState& state, MemoryBus& bus) noexcept
         : state_(state), bus_(bus) {}
+
+    void set_logging(bool enable) noexcept {
+        logging_enabled_ = enable;
+    }
+
+    [[nodiscard]] bool is_logging_enabled() const noexcept {
+        return logging_enabled_;
+    }
+
+    [[nodiscard]] const SimulationStats& get_stats() const noexcept {
+        return stats_;
+    }
+
+    void reset_stats() noexcept {
+        stats_ = SimulationStats{};
+    }
 
     [[nodiscard]] bool evaluate_condition(ConditionCode cond) const noexcept {
         bool n = state_.get_flag_n();
@@ -42,6 +70,22 @@ public:
     }
 
     void execute(const DecodedInstruction& instr) {
+        uint32_t current_pc = state_.get_pc();
+        stats_.opcode_counts[instr.op]++;
+        stats_.instruction_count++;
+
+        if (logging_enabled_) {
+            std::cout << "[TRACE] PC=0x" << std::hex << std::setw(8) << std::setfill('0') << current_pc
+                      << std::dec << " | " << std::setw(6) << std::setfill(' ') << opcode_to_string(instr.op)
+                      << " | Rd=" << static_cast<int>(instr.rd)
+                      << " Rn=" << static_cast<int>(instr.rn)
+                      << " Rm=" << static_cast<int>(instr.rm)
+                      << " Imm=0x" << std::hex << instr.imm << std::dec
+                      << " | NZCV=[" << state_.get_flag_n() << state_.get_flag_z()
+                      << state_.get_flag_c() << state_.get_flag_v() << "]"
+                      << std::endl;
+        }
+
         if (!evaluate_condition(instr.cond)) {
             state_.advance_pc(instr.instr_size);
             return;
@@ -376,7 +420,7 @@ public:
             case Opcode::LDRH:
             case Opcode::LDRSB:
             case Opcode::LDRSH: {
-                uint32_t base = state_.get_reg(instr.rn);
+                uint32_t base = (instr.rn == 15) ? ((state_.get_pc() + 4) & ~3u) : state_.get_reg(instr.rn);
                 uint32_t offset = instr.is_imm ? instr.imm : state_.get_reg(instr.rm);
                 uint32_t addr = base + offset;
 
@@ -422,7 +466,6 @@ public:
             // === Stack Operations: PUSH / POP ===
             case Opcode::PUSH: {
                 uint32_t sp = state_.get_sp();
-                // Count registers
                 int reg_count = 0;
                 for (int i = 0; i < 16; ++i) {
                     if (instr.register_list & (1 << i)) ++reg_count;
@@ -501,7 +544,6 @@ public:
 
             case Opcode::MSR: {
                 uint32_t val = state_.get_reg(instr.rn);
-                // Update CPSR flags (NZCV)
                 state_.set_cpsr((state_.get_cpsr() & 0x0FFFFFFFu) | (val & 0xF0000000u));
                 break;
             }
@@ -535,22 +577,50 @@ public:
     }
 
     uint32_t run(uint64_t max_steps = 1000000) {
+        auto start_time = std::chrono::high_resolution_clock::now();
+
+        auto update_timing = [&]() {
+            auto end_time = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> diff = end_time - start_time;
+            stats_.elapsed_seconds = diff.count();
+            if (stats_.elapsed_seconds > 0.0) {
+                stats_.instructions_per_second = static_cast<double>(stats_.instruction_count) / stats_.elapsed_seconds;
+            }
+        };
+
         for (uint64_t step_count = 0; step_count < max_steps; ++step_count) {
             try {
                 step();
             } catch (const CpuFaultException& e) {
+                update_timing();
                 if (e.get_fault_type() == FaultType::SoftwareInterrupt) {
-                    return state_.get_reg(0); // Exit code in R0
+                    return state_.get_reg(0);
                 }
+                throw;
+            } catch (...) {
+                update_timing();
                 throw;
             }
         }
+        update_timing();
         throw CpuFaultException(FaultType::MemoryOutOfBounds, "Simulation execution exceeded max step limit (" + std::to_string(max_steps) + ")");
+    }
+
+    void dump_coverage_csv(std::ostream& out) const {
+        out << "Opcode,Name,Count\n";
+        for (int i = 1; i <= static_cast<int>(Opcode::NOP); ++i) {
+            Opcode op = static_cast<Opcode>(i);
+            auto it = stats_.opcode_counts.find(op);
+            uint64_t count = (it != stats_.opcode_counts.end()) ? it->second : 0;
+            out << i << "," << opcode_to_string(op) << "," << count << "\n";
+        }
     }
 
 private:
     ArchitecturalState& state_;
     MemoryBus& bus_;
+    SimulationStats stats_{};
+    bool logging_enabled_{false};
 };
 
 } // namespace tinyarmsim
