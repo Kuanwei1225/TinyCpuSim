@@ -54,12 +54,17 @@ struct SnoopResponse {
     uint64_t invalidations_caused{0};
 };
 
+constexpr uint32_t COHERENCE_L1_HIT_LATENCY = 1;
+constexpr uint32_t COHERENCE_UPGRADE_LATENCY = 2;
+constexpr uint32_t COHERENCE_L2_FETCH_LATENCY = 10;
+constexpr uint32_t COHERENCE_PEER_FLUSH_LATENCY = 14;
+
 struct CoherenceAction {
     MESIState old_state{MESIState::INVALID};
     MESIState new_state{MESIState::INVALID};
     BusTransactionType bus_tx{BusTransactionType::NONE};
     bool is_hit{false};
-    uint32_t latency_cycles{1};
+    uint32_t latency_cycles{COHERENCE_L1_HIT_LATENCY};
     uint64_t invalidations{0};
 };
 
@@ -120,7 +125,7 @@ public:
             act.is_hit = true;
             act.new_state = current;
             act.bus_tx = BusTransactionType::NONE;
-            act.latency_cycles = 1;
+            act.latency_cycles = COHERENCE_L1_HIT_LATENCY;
             return act;
         }
 
@@ -137,7 +142,7 @@ public:
             // No other core has it -> Transition to EXCLUSIVE
             act.new_state = MESIState::EXCLUSIVE;
         }
-        act.latency_cycles = snoop.flushed_data ? 12 : 10; // Peer flush or L2 fetch
+        act.latency_cycles = snoop.flushed_data ? COHERENCE_PEER_FLUSH_LATENCY : COHERENCE_L2_FETCH_LATENCY;
         set_state(core_id, line_addr, act.new_state);
         return act;
     }
@@ -154,7 +159,7 @@ public:
             act.is_hit = true;
             act.new_state = MESIState::MODIFIED;
             act.bus_tx = BusTransactionType::NONE;
-            act.latency_cycles = 1;
+            act.latency_cycles = COHERENCE_L1_HIT_LATENCY;
             return act;
         }
 
@@ -163,7 +168,7 @@ public:
             act.is_hit = true;
             act.new_state = MESIState::MODIFIED;
             act.bus_tx = BusTransactionType::NONE;
-            act.latency_cycles = 1;
+            act.latency_cycles = COHERENCE_L1_HIT_LATENCY;
             set_state(core_id, line_addr, MESIState::MODIFIED);
             return act;
         }
@@ -175,7 +180,7 @@ public:
             SnoopResponse snoop = broadcast_snoop(core_id, BusTransactionType::BUS_UPGR, line_addr);
             act.new_state = MESIState::MODIFIED;
             act.invalidations = snoop.invalidations_caused;
-            act.latency_cycles = 2; // Fast upgrade
+            act.latency_cycles = COHERENCE_UPGRADE_LATENCY;
             set_state(core_id, line_addr, MESIState::MODIFIED);
             return act;
         }
@@ -186,7 +191,7 @@ public:
         SnoopResponse snoop = broadcast_snoop(core_id, BusTransactionType::BUS_RDX, line_addr);
         act.new_state = MESIState::MODIFIED;
         act.invalidations = snoop.invalidations_caused;
-        act.latency_cycles = snoop.flushed_data ? 14 : 10;
+        act.latency_cycles = snoop.flushed_data ? COHERENCE_PEER_FLUSH_LATENCY : COHERENCE_L2_FETCH_LATENCY;
         set_state(core_id, line_addr, MESIState::MODIFIED);
         return act;
     }
