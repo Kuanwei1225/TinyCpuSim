@@ -315,7 +315,8 @@ private:
             uint32_t imm5 = (raw_instr >> 3) & 0x1F;
             uint32_t offset = ((i << 5) | imm5) << 1;
             instr.is_imm = true;
-            instr.imm = pc + 4 + offset;
+            instr.is_relative = (pc == 0);
+            instr.imm = (pc != 0) ? (pc + 4 + offset) : offset;
             return instr;
         }
 
@@ -342,7 +343,8 @@ private:
                 int32_t imm8_signed = static_cast<int8_t>(raw_instr & 0xFF);
                 int32_t offset = imm8_signed * 2;
                 instr.is_imm = true;
-                instr.imm = static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + offset);
+                instr.is_relative = (pc == 0);
+                instr.imm = static_cast<uint32_t>((pc != 0) ? (static_cast<int32_t>(pc + 4) + offset) : offset);
                 return instr;
             }
         }
@@ -357,7 +359,8 @@ private:
             }
             int32_t offset = imm11 * 2;
             instr.is_imm = true;
-            instr.imm = static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + offset);
+            instr.is_relative = (pc == 0);
+            instr.imm = static_cast<uint32_t>((pc != 0) ? (static_cast<int32_t>(pc + 4) + offset) : offset);
             return instr;
         }
 
@@ -466,7 +469,8 @@ private:
                                                   (i1 << 23) | (i2 << 22) |
                                                   (imm10 << 12) | (imm11 << 1));
             instr.is_imm = true;
-            instr.imm = static_cast<uint32_t>(static_cast<int32_t>(pc) + 4 + offset);
+            instr.is_relative = (pc == 0);
+            instr.imm = static_cast<uint32_t>((pc != 0) ? (static_cast<int32_t>(pc + 4) + offset) : offset);
             return instr;
         }
 

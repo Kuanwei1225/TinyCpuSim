@@ -10,6 +10,7 @@
 #include "tinyarmsim/memory_bus.hpp"
 #include "tinyarmsim/instruction.hpp"
 #include "tinyarmsim/decoder.hpp"
+#include "tinyarmsim/opcode_cache.hpp"
 #include "tinyarmsim/faults.hpp"
 
 namespace tinyarmsim {
@@ -376,16 +377,22 @@ public:
 
             // === Branching Instructions ===
             case Opcode::B: {
-                state_.set_pc(instr.imm);
+                uint32_t target = instr.is_relative ? static_cast<uint32_t>(static_cast<int32_t>(current_pc + 4) + static_cast<int32_t>(instr.imm)) : instr.imm;
+                state_.set_pc(target);
                 pc_written = true;
                 break;
             }
 
             case Opcode::BL:
             case Opcode::BLX: {
-                uint32_t return_address = state_.get_pc() + instr.instr_size;
+                uint32_t return_address = current_pc + instr.instr_size;
                 state_.set_lr(return_address | 1u);
-                uint32_t target = instr.is_imm ? instr.imm : (state_.get_reg(instr.rm) & ~1u);
+                uint32_t target = 0;
+                if (instr.is_imm) {
+                    target = instr.is_relative ? static_cast<uint32_t>(static_cast<int32_t>(current_pc + 4) + static_cast<int32_t>(instr.imm)) : instr.imm;
+                } else {
+                    target = state_.get_reg(instr.rm) & ~1u;
+                }
                 state_.set_pc(target);
                 pc_written = true;
                 break;
@@ -400,7 +407,8 @@ public:
 
             case Opcode::CBZ: {
                 if (state_.get_reg(instr.rn) == 0) {
-                    state_.set_pc(instr.imm);
+                    uint32_t target = instr.is_relative ? (current_pc + 4 + instr.imm) : instr.imm;
+                    state_.set_pc(target);
                     pc_written = true;
                 }
                 break;
@@ -408,7 +416,8 @@ public:
 
             case Opcode::CBNZ: {
                 if (state_.get_reg(instr.rn) != 0) {
-                    state_.set_pc(instr.imm);
+                    uint32_t target = instr.is_relative ? (current_pc + 4 + instr.imm) : instr.imm;
+                    state_.set_pc(target);
                     pc_written = true;
                 }
                 break;
@@ -568,10 +577,10 @@ public:
         uint16_t first_halfword = bus_.read16(pc);
         if (Decoder::is_32bit_thumb(first_halfword)) {
             uint16_t second_halfword = bus_.read16(pc + 2);
-            DecodedInstruction instr = Decoder::decode32(first_halfword, second_halfword, pc);
+            const DecodedInstruction& instr = opcode_cache_.get_32(first_halfword, second_halfword);
             execute(instr);
         } else {
-            DecodedInstruction instr = Decoder::decode16(first_halfword, pc);
+            const DecodedInstruction& instr = opcode_cache_.get_16(first_halfword);
             execute(instr);
         }
     }
@@ -621,6 +630,7 @@ private:
     MemoryBus& bus_;
     SimulationStats stats_{};
     bool logging_enabled_{false};
+    OpcodeCache opcode_cache_{};
 };
 
 } // namespace tinyarmsim

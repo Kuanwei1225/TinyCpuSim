@@ -149,6 +149,7 @@ struct DecodedInstruction {
 
     bool is_imm{false};
     uint32_t imm{0};
+    bool is_relative{false};
 
     ShiftType shift_type{ShiftType::LSL};
     uint8_t shift_amount{0};
