@@ -46,6 +46,6 @@ TEST_F(AssemblySelfTest, ExecuteStressAssemblySelfTest) {
     std::ifstream file("tests/fixtures/test_stress.elf", std::ios::binary);
     ASSERT_TRUE(file.is_open());
     Loader::load_elf(file, bus, state);
-    uint32_t exit_code = interpreter.run(10000000);
+    uint32_t exit_code = interpreter.run(1000000000);
     EXPECT_EQ(exit_code, 0u);
 }

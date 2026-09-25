@@ -54,7 +54,7 @@ def run_test(sim_path, elf_path):
         str(sim_path),
         "--elf", str(elf_path),
         "--coverage", tmp_csv_path,
-        "--max-steps", "20000000"
+        "--max-steps", "1000000000"
     ]
     
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

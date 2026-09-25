@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
     std::string elf_path;
     std::string coverage_path;
     bool enable_log = false;
-    uint64_t max_steps = 20000000;
+    uint64_t max_steps = 1000000000;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
