@@ -130,4 +130,10 @@ add_executable(cache_test tests/uarch/cache_test.cpp)
 target_link_libraries(cache_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(cache_test)
 
+# uArch MESI Coherence Test
+add_executable(coherence_test tests/uarch/coherence_test.cpp)
+target_link_libraries(coherence_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(coherence_test)
+
+
 
