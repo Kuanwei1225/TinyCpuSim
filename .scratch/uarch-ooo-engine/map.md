@@ -5,11 +5,11 @@ Construct the modular cycle-accurate Out-of-Order (OoO) superscalar core simulat
 
 ## Phased Roadmap & Milestones
 
-### Phase 1: Coherent Memory Hierarchy & Validation Demo (Walking Skeleton)
-- [ ] **Issue 01**: Configuration Schema, Parser & Hardware Counters Reporter (`.scratch/uarch-ooo-engine/issues/01-config-and-stats.md`)
-- [ ] **Issue 02**: Parameterized Cache Subsystem (L1I, L1D, Shared L2, MSHR, Non-blocking) (`.scratch/uarch-ooo-engine/issues/02-cache-subsystem.md`)
-- [ ] **Issue 03**: Multi-Core MESI Snooping Coherence Protocol & Crossbar Interconnect (`.scratch/uarch-ooo-engine/issues/03-branch-predictor-and-frontend.md` -> Coherence ticket)
-- [ ] **Issue 04**: Phase 1 Cache Speedup Benchmark & MESI State Transition Demo
+### Phase 1: Coherent Memory Hierarchy & Validation Demo (Completed)
+- [x] **Issue 01**: Configuration Schema, Parser & Hardware Counters Reporter (`.scratch/uarch-ooo-engine/issues/01-config-and-stats.md`)
+- [x] **Issue 02**: Parameterized Cache Subsystem (L1I, L1D, Shared L2, MSHR, Non-blocking) (`.scratch/uarch-ooo-engine/issues/02-cache-subsystem.md`)
+- [x] **Issue 03**: Multi-Core MESI Snooping Coherence Protocol & Crossbar Interconnect (`.scratch/uarch-ooo-engine/issues/03-branch-predictor-and-frontend.md` -> Coherence ticket)
+- [x] **Issue 04**: Phase 1 Cache Speedup Benchmark & MESI State Transition Demo
 
 ### Phase 2: Front-End, Branch Prediction & Micro-Op Decode
 - [ ] **Issue 05**: Decoupled Fetch with GShare/Bimodal Predictor + BTB + RAS + Micro-Op Decode (Store split to STA/STD)
@@ -19,6 +19,12 @@ Construct the modular cycle-accurate Out-of-Order (OoO) superscalar core simulat
 - [ ] **Issue 07**: Reorder Buffer (ROB) & Issue Queue (Wakeup/Select) with Bypass Matrix (`.scratch/uarch-ooo-engine/issues/05-rob-and-issue-queue.md`)
 - [ ] **Issue 08**: Dual-Issue Load/Store Unit (Dual AGU, LQ, SQ, Store-to-Load Forwarding, MOB Violation Squashing) (`.scratch/uarch-ooo-engine/issues/06-load-store-unit.md`)
 - [ ] **Issue 09**: Integrated Multi-Core OoO Pipeline, CLI Integration (`--uarch-config`, `--uarch-stats`), and End-to-End Stress Verification (`.scratch/uarch-ooo-engine/issues/09-cli-and-benchmarks.md`)
+
+### Phase 4: Multi-Core Workloads & Parallel Verification
+- [ ] **Issue 10**: Multi-Core Execution, Workload Partitioning & Parallel Benchmark Verification (`.scratch/uarch-ooo-engine/issues/10-multicore-workloads.md`)
+
+### Phase 5: Golden Reference & Precision Cross-Validation against gem5
+- [ ] **Issue 11**: Golden Precision Cross-Validation against gem5 (RTL / Reference Target) (`.scratch/uarch-ooo-engine/issues/11-gem5-golden-precision-validation.md`)
 
 ## Key Architecture Decisions
 - **Decoupled Store AGU/Data**: Store instructions are split into `uop_STA` and `uop_STD` so address resolution proceeds independently of data readiness.
