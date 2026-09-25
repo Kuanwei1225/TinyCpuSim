@@ -81,6 +81,11 @@ add_executable(loader_test tests/loader_test.cpp)
 target_link_libraries(loader_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(loader_test)
 
+# Disassembler Test
+add_executable(disassembler_test tests/disassembler_test.cpp)
+target_link_libraries(disassembler_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(disassembler_test)
+
 # ARM GCC Cross-Compiler Detection for Assembly Tests
 find_program(ARM_NONE_EABI_GCC arm-none-eabi-gcc)
 if (ARM_NONE_EABI_GCC)

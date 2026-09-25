@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "tinyarmsim/instruction.hpp"
+#include "tinyarmsim/disassembler.hpp"
 #include "tinyarmsim/faults.hpp"
 
 namespace tinyarmsim {
@@ -14,6 +15,21 @@ public:
     }
 
     [[nodiscard]] static DecodedInstruction decode16(uint16_t raw_instr, uint32_t pc = 0) {
+        DecodedInstruction instr = decode16_internal(raw_instr, pc);
+        instr.raw_hex = raw_instr;
+        instr.disasm = Disassembler::disassemble(instr);
+        return instr;
+    }
+
+    [[nodiscard]] static DecodedInstruction decode32(uint16_t w1, uint16_t w2, uint32_t pc = 0) {
+        DecodedInstruction instr = decode32_internal(w1, w2, pc);
+        instr.raw_hex = (static_cast<uint32_t>(w1) << 16) | w2;
+        instr.disasm = Disassembler::disassemble(instr);
+        return instr;
+    }
+
+private:
+    [[nodiscard]] static DecodedInstruction decode16_internal(uint16_t raw_instr, uint32_t pc) {
         DecodedInstruction instr{};
         instr.instr_size = 2;
         instr.cond = ConditionCode::AL;
@@ -348,7 +364,7 @@ public:
         throw UndefinedInstructionException(raw_instr, pc);
     }
 
-    [[nodiscard]] static DecodedInstruction decode32(uint16_t w1, uint16_t w2, uint32_t pc = 0) {
+    [[nodiscard]] static DecodedInstruction decode32_internal(uint16_t w1, uint16_t w2, uint32_t pc = 0) {
         DecodedInstruction instr{};
         instr.instr_size = 4;
         instr.cond = ConditionCode::AL;

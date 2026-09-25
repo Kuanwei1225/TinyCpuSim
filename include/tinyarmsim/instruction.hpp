@@ -164,6 +164,8 @@ struct DecodedInstruction {
     bool writeback{false};
     bool pre_indexed{true};
     uint16_t register_list{0}; // Bitmask for LDM/STM/PUSH/POP
+    uint32_t raw_hex{0};       // Raw instruction encoding hex
+    std::string disasm;        // Pre-computed disassembly text
 };
 
 } // namespace tinyarmsim
