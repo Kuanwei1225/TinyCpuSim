@@ -18,11 +18,11 @@ struct CacheStats {
     uint64_t invalidations{0};
 
     [[nodiscard]] double hit_rate() const noexcept {
-        return accesses > 0 ? static_cast<double>(hits) / accesses : 0.0;
+        return accesses > 0 ? static_cast<double>(hits) / static_cast<double>(accesses) : 0.0;
     }
 
     [[nodiscard]] double miss_rate() const noexcept {
-        return accesses > 0 ? static_cast<double>(misses) / accesses : 0.0;
+        return accesses > 0 ? static_cast<double>(misses) / static_cast<double>(accesses) : 0.0;
     }
 
     void record_access(bool is_hit) noexcept {
@@ -40,11 +40,11 @@ struct BranchStats {
     uint64_t ras_hits{0};
 
     [[nodiscard]] double accuracy() const noexcept {
-        return predictions > 0 ? static_cast<double>(correct_predictions) / predictions : 1.0;
+        return predictions > 0 ? static_cast<double>(correct_predictions) / static_cast<double>(predictions) : 1.0;
     }
 
     [[nodiscard]] double mispredict_rate() const noexcept {
-        return predictions > 0 ? static_cast<double>(mispredictions) / predictions : 0.0;
+        return predictions > 0 ? static_cast<double>(mispredictions) / static_cast<double>(predictions) : 0.0;
     }
 
     void record_prediction(bool correct) noexcept {
@@ -80,11 +80,11 @@ struct CoreStats {
     LsuStats lsu{};
 
     [[nodiscard]] double ipc() const noexcept {
-        return cycles > 0 ? static_cast<double>(committed_instructions) / cycles : 0.0;
+        return cycles > 0 ? static_cast<double>(committed_instructions) / static_cast<double>(cycles) : 0.0;
     }
 
     [[nodiscard]] double uop_ipc() const noexcept {
-        return cycles > 0 ? static_cast<double>(committed_uops) / cycles : 0.0;
+        return cycles > 0 ? static_cast<double>(committed_uops) / static_cast<double>(cycles) : 0.0;
     }
 };
 
@@ -104,7 +104,7 @@ struct UArchStats {
 
     [[nodiscard]] double total_ipc() const noexcept {
         return total_simulated_cycles > 0 
-            ? static_cast<double>(total_committed_instructions()) / total_simulated_cycles 
+            ? static_cast<double>(total_committed_instructions()) / static_cast<double>(total_simulated_cycles) 
             : 0.0;
     }
 

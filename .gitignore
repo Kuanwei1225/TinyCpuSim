@@ -69,4 +69,6 @@ Testing/
 .cache/
 .DS_Store
 .antigravity/
+uarch_stats.txt
+cov.csv
 

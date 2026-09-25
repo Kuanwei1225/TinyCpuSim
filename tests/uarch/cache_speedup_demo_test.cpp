@@ -56,7 +56,7 @@ TEST(Phase1DemoTest, CacheSpeedupOverUncachedDramAccess) {
         }
     }
 
-    double speedup = static_cast<double>(uncached_cycles) / cached_cycles;
+    double speedup = static_cast<double>(uncached_cycles) / static_cast<double>(cached_cycles);
     double l1_hit_rate = cached_mem.get_l1d(0).get_stats().hit_rate() * 100.0;
 
     std::cout << "\n============================================================\n"
