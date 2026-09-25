@@ -119,3 +119,9 @@ endif()
 gtest_discover_tests(assembly_self_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# uArch Config and Stats Test
+add_executable(config_and_stats_test tests/uarch/config_and_stats_test.cpp)
+target_link_libraries(config_and_stats_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(config_and_stats_test)
+
