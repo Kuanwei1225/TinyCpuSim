@@ -197,6 +197,7 @@ int main(int argc, char* argv[]) {
 
     if (enable_uarch) {
         tinyarmsim::uarch::UArchStats ustats;
+        ustats.wall_time_seconds = stats.elapsed_seconds;
         ustats.total_simulated_cycles = stats.instruction_count > 0 ? static_cast<uint64_t>(stats.instruction_count * 1.2) : 0;
         tinyarmsim::uarch::CoreStats core0;
         core0.committed_instructions = stats.instruction_count;

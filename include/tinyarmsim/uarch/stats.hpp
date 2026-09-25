@@ -90,6 +90,7 @@ struct CoreStats {
 
 struct UArchStats {
     uint64_t total_simulated_cycles{0};
+    double target_frequency_mhz{1000.0}; // Default 1.0 GHz (1 cycle = 1.0 ns)
     double wall_time_seconds{0.0};
     std::vector<CoreStats> cores{};
     CacheStats l2_shared{};
@@ -108,16 +109,48 @@ struct UArchStats {
             : 0.0;
     }
 
+    [[nodiscard]] double simulated_time_seconds() const noexcept {
+        return target_frequency_mhz > 0.0
+            ? static_cast<double>(total_simulated_cycles) / (target_frequency_mhz * 1e6)
+            : 0.0;
+    }
+
+    [[nodiscard]] double simulation_speed_ticks_per_sec() const noexcept {
+        return wall_time_seconds > 0.0
+            ? static_cast<double>(total_simulated_cycles) / wall_time_seconds
+            : 0.0;
+    }
+
+    [[nodiscard]] double simulation_mips() const noexcept {
+        return wall_time_seconds > 0.0
+            ? static_cast<double>(total_committed_instructions()) / (wall_time_seconds * 1e6)
+            : 0.0;
+    }
+
+    [[nodiscard]] double slowdown_ratio() const noexcept {
+        double sim_t = simulated_time_seconds();
+        return sim_t > 0.0 ? wall_time_seconds / sim_t : 0.0;
+    }
+
     [[nodiscard]] std::string format_text() const {
         std::ostringstream oss;
         oss << "============================================================\n"
             << "               TinyArmSim uArch Simulation Report           \n"
             << "============================================================\n"
-            << "Simulated Cycles:          " << total_simulated_cycles << "\n"
+            << "Simulated Target Clock:    " << std::fixed << std::setprecision(2) << target_frequency_mhz << " MHz\n"
+            << "Simulated Target Time:     " << std::scientific << std::setprecision(4) << simulated_time_seconds() << " s\n"
+            << "Simulated Total Cycles:    " << std::fixed << total_simulated_cycles << " ticks\n"
             << "Total Committed Insts:     " << total_committed_instructions() << "\n"
             << std::fixed << std::setprecision(3)
             << "Aggregate Throughput (IPC):" << total_ipc() << " inst/cycle\n"
             << "Active Core Count:         " << cores.size() << "\n"
+            << "------------------------------------------------------------\n"
+            << "[ Host Simulator Performance ]\n"
+            << "  Host Wall-Clock Time:    " << std::fixed << std::setprecision(6) << wall_time_seconds << " s\n"
+            << "  Simulation Speed (Ticks):" << std::fixed << std::setprecision(2) << simulation_speed_ticks_per_sec() << " ticks/s (" 
+            << (simulation_speed_ticks_per_sec() / 1e6) << " M-Ticks/s)\n"
+            << "  Simulation MIPS:         " << std::fixed << std::setprecision(2) << simulation_mips() << " MIPS\n"
+            << "  Simulation Slowdown:     " << std::fixed << std::setprecision(1) << slowdown_ratio() << "x\n"
             << "------------------------------------------------------------\n";
 
         for (size_t i = 0; i < cores.size(); ++i) {
