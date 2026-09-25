@@ -86,6 +86,11 @@ add_executable(disassembler_test tests/disassembler_test.cpp)
 target_link_libraries(disassembler_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(disassembler_test)
 
+# Spike Trace Test
+add_executable(trace_test tests/trace_test.cpp)
+target_link_libraries(trace_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(trace_test)
+
 # ARM GCC Cross-Compiler Detection for Assembly Tests
 find_program(ARM_NONE_EABI_GCC arm-none-eabi-gcc)
 if (ARM_NONE_EABI_GCC)

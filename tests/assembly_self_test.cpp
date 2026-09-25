@@ -41,3 +41,11 @@ TEST_F(AssemblySelfTest, ExecuteSortAssemblySelfTest) {
 TEST_F(AssemblySelfTest, ExecuteIsaCoverageAssemblySelfTest) {
     run_elf_fixture("tests/fixtures/test_isa_coverage.elf", 0);
 }
+
+TEST_F(AssemblySelfTest, ExecuteStressAssemblySelfTest) {
+    std::ifstream file("tests/fixtures/test_stress.elf", std::ios::binary);
+    ASSERT_TRUE(file.is_open());
+    Loader::load_elf(file, bus, state);
+    uint32_t exit_code = interpreter.run(10000000);
+    EXPECT_EQ(exit_code, 0u);
+}
