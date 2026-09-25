@@ -18,7 +18,7 @@ void print_usage(const char* prog_name) {
               << "  --elf <file>          Specify input ELF binary file\n"
               << "  -l, --log, --verbose  Enable step-by-step instruction trace logging\n"
               << "  -c, --coverage <file> Export instruction opcode coverage report to CSV\n"
-              << "  -m, --max-steps <N>   Set maximum instruction execution steps (default: 5000000)\n"
+              << "  -m, --max-steps <N>   Set maximum instruction execution steps (default: 1000000000)\n"
               << "  -h, --help            Display this help message\n"
               << std::endl;
 }

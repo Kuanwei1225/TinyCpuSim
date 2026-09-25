@@ -6,6 +6,12 @@
 
 namespace tinyarmsim {
 
+// Register index constants
+constexpr size_t REG_SP = 13;
+constexpr size_t REG_LR = 14;
+constexpr size_t REG_PC = 15;
+constexpr size_t NUM_REGISTERS = 16;
+
 // CPSR / APSR flag bit positions
 constexpr uint32_t FLAG_N_BIT = 31; // Negative
 constexpr uint32_t FLAG_Z_BIT = 30; // Zero
@@ -25,29 +31,29 @@ public:
     }
 
     [[nodiscard]] uint32_t get_reg(size_t reg_num) const {
-        if (reg_num >= 16) {
+        if (reg_num >= NUM_REGISTERS) {
             throw CpuFaultException(FaultType::IllegalRegister, "Register index out of bounds: " + std::to_string(reg_num));
         }
         return registers_[reg_num];
     }
 
     void set_reg(size_t reg_num, uint32_t val) {
-        if (reg_num >= 16) {
+        if (reg_num >= NUM_REGISTERS) {
             throw CpuFaultException(FaultType::IllegalRegister, "Register index out of bounds: " + std::to_string(reg_num));
         }
         registers_[reg_num] = val;
     }
 
     // Convenience register accessors
-    [[nodiscard]] uint32_t get_sp() const noexcept { return registers_[13]; }
-    void set_sp(uint32_t val) noexcept { registers_[13] = val; }
+    [[nodiscard]] uint32_t get_sp() const noexcept { return registers_[REG_SP]; }
+    void set_sp(uint32_t val) noexcept { registers_[REG_SP] = val; }
 
-    [[nodiscard]] uint32_t get_lr() const noexcept { return registers_[14]; }
-    void set_lr(uint32_t val) noexcept { registers_[14] = val; }
+    [[nodiscard]] uint32_t get_lr() const noexcept { return registers_[REG_LR]; }
+    void set_lr(uint32_t val) noexcept { registers_[REG_LR] = val; }
 
-    [[nodiscard]] uint32_t get_pc() const noexcept { return registers_[15]; }
-    void set_pc(uint32_t val) noexcept { registers_[15] = val; }
-    void advance_pc(uint32_t bytes) noexcept { registers_[15] += bytes; }
+    [[nodiscard]] uint32_t get_pc() const noexcept { return registers_[REG_PC]; }
+    void set_pc(uint32_t val) noexcept { registers_[REG_PC] = val; }
+    void advance_pc(uint32_t bytes) noexcept { registers_[REG_PC] += bytes; }
 
     // Status register and NZCV flags
     [[nodiscard]] uint32_t get_cpsr() const noexcept { return cpsr_; }
@@ -72,6 +78,11 @@ public:
         set_flag_v(v);
     }
 
+    void set_nz_flags(uint32_t val) noexcept {
+        set_flag_n((val & 0x80000000u) != 0);
+        set_flag_z(val == 0);
+    }
+
 private:
     void set_flag_bit(uint32_t bit, bool val) noexcept {
         if (val) {
@@ -81,7 +92,7 @@ private:
         }
     }
 
-    std::array<uint32_t, 16> registers_{};
+    std::array<uint32_t, NUM_REGISTERS> registers_{};
     uint32_t cpsr_{0};
 };
 

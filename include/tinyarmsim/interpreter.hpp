@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <unordered_map>
 #include <fstream>
+#include "tinyarmsim/common.hpp"
 #include "tinyarmsim/state.hpp"
 #include "tinyarmsim/memory_bus.hpp"
 #include "tinyarmsim/instruction.hpp"
@@ -87,13 +88,7 @@ public:
 
         if (!evaluate_condition(instr.cond)) {
             state_.advance_pc(instr.instr_size);
-            if (logging_enabled_) {
-                trace_.flag_n = state_.get_flag_n();
-                trace_.flag_z = state_.get_flag_z();
-                trace_.flag_c = state_.get_flag_c();
-                trace_.flag_v = state_.get_flag_v();
-                std::cout << trace_.format() << " [condition false]\n";
-            }
+            log_trace("[condition false]");
             return;
         }
 
@@ -104,29 +99,19 @@ public:
             if (logging_enabled_) {
                 trace_.reg_writes.push_back({static_cast<uint8_t>(r), val});
             }
-            if (r == 15) pc_written = true;
+            if (r == REG_PC) pc_written = true;
         };
 
         auto write_sp = [&](uint32_t val) {
-            state_.set_sp(val);
-            if (logging_enabled_) {
-                trace_.reg_writes.push_back({13, val});
-            }
+            write_reg(REG_SP, val);
         };
 
         auto write_lr = [&](uint32_t val) {
-            state_.set_lr(val);
-            if (logging_enabled_) {
-                trace_.reg_writes.push_back({14, val});
-            }
+            write_reg(REG_LR, val);
         };
 
         auto write_pc = [&](uint32_t val) {
-            state_.set_pc(val);
-            pc_written = true;
-            if (logging_enabled_) {
-                trace_.reg_writes.push_back({15, val});
-            }
+            write_reg(REG_PC, val);
         };
 
         auto write_mem = [&](uint32_t addr, uint32_t val, uint8_t size) {
@@ -160,8 +145,7 @@ public:
                 uint32_t val = instr.is_imm ? instr.imm : state_.get_reg(instr.rm);
                 write_reg(instr.rd, val);
                 if (instr.set_flags) {
-                    state_.set_flag_n((val & 0x80000000u) != 0);
-                    state_.set_flag_z(val == 0);
+                    state_.set_nz_flags(val);
                 }
                 break;
             }
@@ -170,8 +154,7 @@ public:
                 uint32_t val = ~(instr.is_imm ? instr.imm : state_.get_reg(instr.rm));
                 write_reg(instr.rd, val);
                 if (instr.set_flags) {
-                    state_.set_flag_n((val & 0x80000000u) != 0);
-                    state_.set_flag_z(val == 0);
+                    state_.set_nz_flags(val);
                 }
                 break;
             }
@@ -289,8 +272,7 @@ public:
                 uint32_t res = op1 * op2;
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -302,8 +284,7 @@ public:
                 uint32_t res = (op1 * op2) + op3;
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -317,8 +298,7 @@ public:
                     write_reg(instr.rd, res);
                 }
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -329,8 +309,7 @@ public:
                 uint32_t res = op1 | op2;
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -344,8 +323,7 @@ public:
                     write_reg(instr.rd, res);
                 }
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -356,8 +334,7 @@ public:
                 uint32_t res = op1 & (~op2);
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -384,8 +361,7 @@ public:
                 uint32_t res = (shift >= 32) ? 0 : (val << shift);
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -396,8 +372,7 @@ public:
                 uint32_t res = (shift >= 32) ? 0 : (val >> shift);
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -409,8 +384,7 @@ public:
                 uint32_t res = static_cast<uint32_t>(val >> shift);
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -421,8 +395,7 @@ public:
                 uint32_t res = (shift == 0) ? val : ((val >> shift) | (val << (32 - shift)));
                 write_reg(instr.rd, res);
                 if (instr.set_flags) {
-                    state_.set_flag_n((res & 0x80000000u) != 0);
-                    state_.set_flag_z(res == 0);
+                    state_.set_nz_flags(res);
                 }
                 break;
             }
@@ -476,12 +449,12 @@ public:
             case Opcode::LDRH:
             case Opcode::LDRSB:
             case Opcode::LDRSH: {
-                uint32_t base = (instr.rn == 15) ? ((current_pc + 4) & ~3u) : state_.get_reg(instr.rn);
+                uint32_t base = (instr.rn == REG_PC) ? ((current_pc + 4) & ~3u) : state_.get_reg(instr.rn);
                 uint32_t offset = instr.is_imm ? instr.imm : state_.get_reg(instr.rm);
                 uint32_t addr = base + offset;
 
                 uint32_t loaded_val = read_mem(addr, instr.mem_size, instr.is_signed_mem);
-                if (instr.rd == 15) {
+                if (instr.rd == REG_PC) {
                     write_pc(loaded_val & ~1u);
                 } else {
                     write_reg(instr.rd, loaded_val);
@@ -504,15 +477,12 @@ public:
             // === Stack Operations: PUSH / POP ===
             case Opcode::PUSH: {
                 uint32_t sp = state_.get_sp();
-                int reg_count = 0;
-                for (int i = 0; i < 16; ++i) {
-                    if (instr.register_list & (1 << i)) ++reg_count;
-                }
-                uint32_t new_sp = sp - static_cast<uint32_t>(reg_count * 4);
+                uint32_t reg_count = popcount(instr.register_list);
+                uint32_t new_sp = sp - (reg_count * 4);
                 uint32_t cur_addr = new_sp;
-                for (int i = 0; i < 16; ++i) {
+                for (size_t i = 0; i < NUM_REGISTERS; ++i) {
                     if (instr.register_list & (1 << i)) {
-                        write_mem(cur_addr, state_.get_reg(static_cast<size_t>(i)), 4);
+                        write_mem(cur_addr, state_.get_reg(i), 4);
                         cur_addr += 4;
                     }
                 }
@@ -523,13 +493,13 @@ public:
             case Opcode::POP: {
                 uint32_t sp = state_.get_sp();
                 uint32_t cur_addr = sp;
-                for (int i = 0; i < 16; ++i) {
+                for (size_t i = 0; i < NUM_REGISTERS; ++i) {
                     if (instr.register_list & (1 << i)) {
                         uint32_t val = read_mem(cur_addr, 4, false);
-                        if (i == 15) {
+                        if (i == REG_PC) {
                             write_pc(val & ~1u);
                         } else {
-                            write_reg(static_cast<size_t>(i), val);
+                            write_reg(i, val);
                         }
                         cur_addr += 4;
                     }
@@ -542,9 +512,9 @@ public:
             case Opcode::STM: {
                 uint32_t base = state_.get_reg(instr.rn);
                 uint32_t cur_addr = base;
-                for (int i = 0; i < 16; ++i) {
+                for (size_t i = 0; i < NUM_REGISTERS; ++i) {
                     if (instr.register_list & (1 << i)) {
-                        write_mem(cur_addr, state_.get_reg(static_cast<size_t>(i)), 4);
+                        write_mem(cur_addr, state_.get_reg(i), 4);
                         cur_addr += 4;
                     }
                 }
@@ -557,13 +527,13 @@ public:
             case Opcode::LDM: {
                 uint32_t base = state_.get_reg(instr.rn);
                 uint32_t cur_addr = base;
-                for (int i = 0; i < 16; ++i) {
+                for (size_t i = 0; i < NUM_REGISTERS; ++i) {
                     if (instr.register_list & (1 << i)) {
                         uint32_t val = read_mem(cur_addr, 4, false);
-                        if (i == 15) {
+                        if (i == REG_PC) {
                             write_pc(val & ~1u);
                         } else {
-                            write_reg(static_cast<size_t>(i), val);
+                            write_reg(i, val);
                         }
                         cur_addr += 4;
                     }
@@ -590,26 +560,14 @@ public:
                 break;
 
             case Opcode::SVC:
-                if (logging_enabled_) {
-                    trace_.flag_n = state_.get_flag_n();
-                    trace_.flag_z = state_.get_flag_z();
-                    trace_.flag_c = state_.get_flag_c();
-                    trace_.flag_v = state_.get_flag_v();
-                    std::cout << trace_.format() << "\n";
-                }
+                log_trace();
                 throw CpuFaultException(FaultType::SoftwareInterrupt, "SVC interrupt with code " + std::to_string(instr.imm));
 
             default:
                 throw CpuFaultException(FaultType::UndefinedInstruction, "Unhandled opcode in interpreter");
         }
 
-        if (logging_enabled_) {
-            trace_.flag_n = state_.get_flag_n();
-            trace_.flag_z = state_.get_flag_z();
-            trace_.flag_c = state_.get_flag_c();
-            trace_.flag_v = state_.get_flag_v();
-            std::cout << trace_.format() << "\n";
-        }
+        log_trace();
 
         if (!pc_written) {
             state_.advance_pc(instr.instr_size);
@@ -670,6 +628,20 @@ public:
     }
 
 private:
+    void log_trace(std::string_view note = "") {
+        if (logging_enabled_) {
+            trace_.flag_n = state_.get_flag_n();
+            trace_.flag_z = state_.get_flag_z();
+            trace_.flag_c = state_.get_flag_c();
+            trace_.flag_v = state_.get_flag_v();
+            if (note.empty()) {
+                std::cout << trace_.format() << "\n";
+            } else {
+                std::cout << trace_.format() << " " << note << "\n";
+            }
+        }
+    }
+
     ArchitecturalState& state_;
     MemoryBus& bus_;
     SimulationStats stats_{};

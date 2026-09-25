@@ -14,4 +14,17 @@ constexpr uint32_t VERSION_PATCH = 0;
     return "0.1.0";
 }
 
+[[nodiscard]] inline uint32_t popcount(uint32_t val) noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+    return static_cast<uint32_t>(__builtin_popcount(val));
+#else
+    uint32_t count = 0;
+    while (val) {
+        val &= (val - 1);
+        count++;
+    }
+    return count;
+#endif
+}
+
 } // namespace tinyarmsim

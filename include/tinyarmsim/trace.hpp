@@ -5,6 +5,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include "tinyarmsim/disassembler.hpp"
 
 namespace tinyarmsim {
 
@@ -53,7 +54,7 @@ struct TraceRecord {
             for (size_t i = 0; i < reg_writes.size(); ++i) {
                 if (i > 0) oss << ", ";
                 uint8_t r = reg_writes[i].reg;
-                std::string r_name = (r == 13) ? "sp" : (r == 14) ? "lr" : (r == 15) ? "pc" : ("r" + std::to_string(r));
+                std::string r_name = Disassembler::reg_name(r);
                 oss << r_name << " 0x" << std::hex << std::setw(8) << std::setfill('0') << reg_writes[i].val << std::dec;
             }
         }
