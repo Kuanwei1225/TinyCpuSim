@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iomanip>
 #include "tinyarmsim/common.hpp"
+#include "tinyarmsim/instruction.hpp"
 
 namespace tinyarmsim::uarch {
 

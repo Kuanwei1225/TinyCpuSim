@@ -154,3 +154,23 @@ gtest_discover_tests(uop_decoder_test)
 add_executable(fetch_unit_test tests/uarch/fetch_unit_test.cpp)
 target_link_libraries(fetch_unit_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(fetch_unit_test)
+
+# uArch PRF, FreeList, and RAT Checkpointing Test
+add_executable(rat_prf_test tests/uarch/rat_prf_test.cpp)
+target_link_libraries(rat_prf_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(rat_prf_test)
+
+# uArch ReorderBuffer and IssueQueue Test
+add_executable(rob_issue_queue_test tests/uarch/rob_issue_queue_test.cpp)
+target_link_libraries(rob_issue_queue_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(rob_issue_queue_test)
+
+# uArch LSU and Store-to-Load Forwarding Test
+add_executable(lsu_test tests/uarch/lsu_test.cpp)
+target_link_libraries(lsu_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(lsu_test)
+
+# uArch OoOCore End-to-End Pipeline Test
+add_executable(ooo_core_test tests/uarch/ooo_core_test.cpp)
+target_link_libraries(ooo_core_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(ooo_core_test)

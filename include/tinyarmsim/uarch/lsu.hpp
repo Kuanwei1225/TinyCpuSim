@@ -1,0 +1,254 @@
+#pragma once
+
+#include <cstdint>
+#include <vector>
+#include <deque>
+#include <optional>
+#include <stdexcept>
+#include <algorithm>
+#include "tinyarmsim/uarch/uop.hpp"
+#include "tinyarmsim/uarch/config.hpp"
+#include "tinyarmsim/uarch/stats.hpp"
+#include "tinyarmsim/uarch/cache.hpp"
+
+namespace tinyarmsim::uarch {
+
+struct LoadQueueEntry {
+    size_t lq_idx{0};
+    UOp uop{};
+    uint32_t addr{0};
+    uint8_t size_bytes{4};
+    bool addr_valid{false};
+    bool data_ready{false};
+    uint32_t data{0};
+    bool forwarded_from_sq{false};
+    bool valid{false};
+};
+
+struct StoreQueueEntry {
+    size_t sq_idx{0};
+    uint64_t seq_num{0};
+    size_t rob_idx{0};
+    uint32_t addr{0};
+    uint32_t data{0};
+    uint8_t size_bytes{4};
+    bool addr_valid{false};
+    bool data_valid{false};
+    bool committed{false};
+    bool valid{false};
+};
+
+class LoadStoreUnit {
+public:
+    LoadStoreUnit(const LsuConfig& cfg, Cache* l1d_cache)
+        : config_(cfg),
+          l1d_(l1d_cache),
+          lq_(cfg.lq_size > 0 ? cfg.lq_size : 16),
+          sq_(cfg.sq_size > 0 ? cfg.sq_size : 16),
+          lq_capacity_(cfg.lq_size > 0 ? cfg.lq_size : 16),
+          sq_capacity_(cfg.sq_size > 0 ? cfg.sq_size : 16),
+          lq_count_(0),
+          sq_count_(0) {}
+
+    [[nodiscard]] bool can_allocate_load() const noexcept {
+        return lq_count_ < lq_capacity_;
+    }
+
+    [[nodiscard]] bool can_allocate_store() const noexcept {
+        return sq_count_ < sq_capacity_;
+    }
+
+    size_t allocate_load(const UOp& uop) {
+        if (!can_allocate_load()) throw std::runtime_error("LoadQueue full");
+        for (size_t i = 0; i < lq_capacity_; ++i) {
+            if (!lq_[i].valid) {
+                lq_[i].lq_idx = i;
+                lq_[i].uop = uop;
+                lq_[i].addr_valid = false;
+                lq_[i].data_ready = false;
+                lq_[i].valid = true;
+                lq_count_++;
+                return i;
+            }
+        }
+        throw std::runtime_error("LoadQueue allocation failed");
+    }
+
+    size_t allocate_store(const UOp& uop) {
+        if (!can_allocate_store()) throw std::runtime_error("StoreQueue full");
+        for (size_t i = 0; i < sq_capacity_; ++i) {
+            if (!sq_[i].valid) {
+                sq_[i].sq_idx = i;
+                sq_[i].seq_num = uop.seq_num;
+                sq_[i].rob_idx = uop.rob_idx;
+                sq_[i].addr_valid = false;
+                sq_[i].data_valid = false;
+                sq_[i].committed = false;
+                sq_[i].valid = true;
+                sq_count_++;
+                return i;
+            }
+        }
+        throw std::runtime_error("StoreQueue allocation failed");
+    }
+
+    // Execute Store Address uop (STA) -> Port 3
+    // Returns true if a speculative load memory hazard violation is detected
+    bool execute_store_address(size_t sq_idx, uint32_t addr, uint8_t size_bytes, uint64_t store_seq_num, size_t& out_violating_rob_idx) {
+        if (sq_idx >= sq_capacity_ || !sq_[sq_idx].valid) {
+            throw std::out_of_range("Invalid SQ index for STA");
+        }
+        sq_[sq_idx].addr = addr;
+        sq_[sq_idx].size_bytes = size_bytes;
+        sq_[sq_idx].addr_valid = true;
+
+        // Memory Order Buffer (MOB) Disambiguation:
+        // Check if any younger speculative load already executed and read from the same line/address
+        for (const auto& lq_entry : lq_) {
+            if (lq_entry.valid && lq_entry.addr_valid && lq_entry.data_ready) {
+                if (lq_entry.uop.seq_num > store_seq_num) {
+                    // Overlapping address check
+                    if (lq_entry.addr == addr || (lq_entry.addr >> 2) == (addr >> 2)) {
+                        if (!lq_entry.forwarded_from_sq) {
+                            out_violating_rob_idx = lq_entry.uop.rob_idx;
+                            stats_.memory_order_violations++;
+                            return true; // Memory hazard violation!
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // Execute Store Data uop (STD) -> Port 4
+    void execute_store_data(size_t sq_idx, uint32_t data) {
+        if (sq_idx >= sq_capacity_ || !sq_[sq_idx].valid) {
+            throw std::out_of_range("Invalid SQ index for STD");
+        }
+        sq_[sq_idx].data = data;
+        sq_[sq_idx].data_valid = true;
+    }
+
+    // Execute Load uop (LDA) -> Port 2 / Port 3
+    struct LoadResult {
+        bool completed{false};
+        uint32_t data{0};
+        bool forwarded{false};
+        uint32_t latency_cycles{1};
+    };
+
+    LoadResult execute_load(size_t lq_idx, uint32_t addr, uint8_t size_bytes, uint64_t load_seq_num) {
+        if (lq_idx >= lq_capacity_ || !lq_[lq_idx].valid) {
+            throw std::out_of_range("Invalid LQ index for load");
+        }
+        lq_[lq_idx].addr = addr;
+        lq_[lq_idx].size_bytes = size_bytes;
+        lq_[lq_idx].addr_valid = true;
+        stats_.loads++;
+
+        LoadResult res;
+
+        // 1. Store-to-Load Forwarding Check (Search older SQ entries)
+        if (config_.enable_store_forwarding) {
+            int best_match = -1;
+            uint64_t latest_older_seq = 0;
+
+            for (size_t i = 0; i < sq_capacity_; ++i) {
+                const auto& sq = sq_[i];
+                if (sq.valid && sq.addr_valid && sq.seq_num < load_seq_num) {
+                    if (sq.addr == addr && sq.size_bytes == size_bytes) {
+                        if (sq.seq_num >= latest_older_seq) {
+                            latest_older_seq = sq.seq_num;
+                            best_match = static_cast<int>(i);
+                        }
+                    }
+                }
+            }
+
+            if (best_match != -1 && sq_[static_cast<size_t>(best_match)].data_valid) {
+                res.completed = true;
+                res.forwarded = true;
+                res.data = sq_[static_cast<size_t>(best_match)].data;
+                res.latency_cycles = config_.store_forward_latency > 0 ? config_.store_forward_latency : 1;
+
+                lq_[lq_idx].data = res.data;
+                lq_[lq_idx].data_ready = true;
+                lq_[lq_idx].forwarded_from_sq = true;
+                stats_.forwarded_loads++;
+                return res;
+            }
+        }
+
+        // 2. L1 Data Cache Access
+        if (l1d_ && l1d_->get_config().enabled) {
+            uint32_t lat = 1;
+            auto cache_res = l1d_->access(addr, false, lat);
+            res.completed = true;
+            res.latency_cycles = cache_res.latency_cycles;
+        } else {
+            res.completed = true;
+            res.latency_cycles = 1;
+        }
+
+        lq_[lq_idx].data_ready = true;
+        return res;
+    }
+
+    // Commit Store: Drains from SQ to L1D Cache upon ROB retirement
+    void commit_store(size_t sq_idx) {
+        if (sq_idx >= sq_capacity_ || !sq_[sq_idx].valid) return;
+        const auto& sq = sq_[sq_idx];
+        if (l1d_ && l1d_->get_config().enabled) {
+            uint32_t lat = 1;
+            l1d_->access(sq.addr, true, lat);
+        }
+        stats_.stores++;
+        sq_[sq_idx].valid = false;
+        if (sq_count_ > 0) sq_count_--;
+    }
+
+    void free_load(size_t lq_idx) {
+        if (lq_idx >= lq_capacity_ || !lq_[lq_idx].valid) return;
+        lq_[lq_idx].valid = false;
+        if (lq_count_ > 0) lq_count_--;
+    }
+
+    // Flush on pipeline squash / misprediction
+    void flush_younger_than(uint64_t seq_num) noexcept {
+        for (auto& lq : lq_) {
+            if (lq.valid && lq.uop.seq_num > seq_num) {
+                lq.valid = false;
+                if (lq_count_ > 0) lq_count_--;
+            }
+        }
+        for (auto& sq : sq_) {
+            if (sq.valid && sq.seq_num > seq_num) {
+                sq.valid = false;
+                if (sq_count_ > 0) sq_count_--;
+            }
+        }
+    }
+
+    void reset() noexcept {
+        for (auto& l : lq_) l.valid = false;
+        for (auto& s : sq_) s.valid = false;
+        lq_count_ = 0;
+        sq_count_ = 0;
+    }
+
+    [[nodiscard]] const LsuStats& get_stats() const noexcept { return stats_; }
+
+private:
+    LsuConfig config_;
+    Cache* l1d_{nullptr};
+    std::vector<LoadQueueEntry> lq_;
+    std::vector<StoreQueueEntry> sq_;
+    size_t lq_capacity_;
+    size_t sq_capacity_;
+    size_t lq_count_;
+    size_t sq_count_;
+    LsuStats stats_{};
+};
+
+} // namespace tinyarmsim::uarch
