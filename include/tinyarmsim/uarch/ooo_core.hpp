@@ -124,6 +124,9 @@ public:
         s.rs_full_stalls = rs_full_stalls_;
         s.rename_reg_exhaustion_stalls = rename_stalls_;
         s.branch_mispredict_flushes = branch_flushes_;
+        s.branch.predictions = branch_pred_count_;
+        s.branch.mispredictions = branch_flushes_;
+        s.branch.correct_predictions = (branch_pred_count_ >= branch_flushes_) ? (branch_pred_count_ - branch_flushes_) : 0;
         if (l1i_) s.l1i = l1i_->get_stats();
         if (l1d_) s.l1d = l1d_->get_stats();
         s.lsu = lsu_.get_stats();
