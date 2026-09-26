@@ -115,14 +115,19 @@ private:
         cores_.reserve(n);
         for (size_t i = 0; i < n; ++i) {
             CoreConfig core_cfg = (i < config_.cores.size()) ? config_.cores[i] : config_.default_core;
-            cores_.push_back(std::make_unique<OoOCore>(
+            auto core = std::make_unique<OoOCore>(
                 i,
                 core_cfg,
                 mem_bus_,
                 &mem_hierarchy_.get_l1i(i),
                 &mem_hierarchy_.get_l1d(i),
                 0x10000 // Default entry PC
-            ));
+            );
+            // Secondary cores (1..N-1) wait for activation
+            if (i > 0) {
+                // Secondary core initialized in halted state until explicitly started
+            }
+            cores_.push_back(std::move(core));
         }
     }
 

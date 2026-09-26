@@ -205,7 +205,7 @@ int main(int argc, char* argv[]) {
             try {
                 tinyarmsim::Loader::load_elf(uarch_elf_file, uarch_sys.get_bus(), ustate);
                 uarch_sys.set_entry_pc(0, ustate.get_pc());
-                uarch_sys.run(max_steps);
+                uarch_sys.run(stats.instruction_count * 10 + 500);
             } catch (...) {}
         }
 
