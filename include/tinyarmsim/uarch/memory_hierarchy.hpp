@@ -76,24 +76,14 @@ public:
         if (l1_res.hit) {
             resp.is_l1_hit = true;
             resp.latency_cycles = l1_res.latency_cycles;
-            resp.data = physical_bus_.read16(addr);
-            return resp;
-        }
-
-        // L1I Miss -> Query Shared L2
-        if (l2_cache_.get_config().is_active()) {
-            auto l2_res = l2_cache_.access(addr, false, current_cycle);
-            if (l2_res.hit) {
+        } else {
+            if (l1_res.latency_cycles >= config_.dram_latency_cycles) {
+                resp.is_dram_access = true;
+            } else {
                 resp.is_l2_hit = true;
-                resp.latency_cycles = l1_res.latency_cycles + l2_res.latency_cycles;
-                resp.data = physical_bus_.read16(addr);
-                return resp;
             }
+            resp.latency_cycles = l1_res.latency_cycles;
         }
-
-        // L2 Miss -> DRAM Access
-        resp.is_dram_access = true;
-        resp.latency_cycles = l1_res.latency_cycles + config_.dram_latency_cycles;
         resp.data = physical_bus_.read16(addr);
         return resp;
     }
@@ -132,24 +122,14 @@ public:
         if (l1_res.hit) {
             resp.is_l1_hit = true;
             resp.latency_cycles = l1_res.latency_cycles;
-            resp.data = read_bus_data(addr, size);
-            return resp;
-        }
-
-        // L1D Miss -> Query Shared L2
-        if (l2_cache_.get_config().is_active()) {
-            auto l2_res = l2_cache_.access(addr, false, current_cycle);
-            if (l2_res.hit) {
+        } else {
+            if (l1_res.latency_cycles >= config_.dram_latency_cycles) {
+                resp.is_dram_access = true;
+            } else {
                 resp.is_l2_hit = true;
-                resp.latency_cycles = l1_res.latency_cycles + l2_res.latency_cycles + (coh_act.latency_cycles > 1 ? coh_act.latency_cycles : 0);
-                resp.data = read_bus_data(addr, size);
-                return resp;
             }
+            resp.latency_cycles = l1_res.latency_cycles + (coh_act.latency_cycles > 1 ? coh_act.latency_cycles : 0);
         }
-
-        // L2 Miss -> DRAM Access
-        resp.is_dram_access = true;
-        resp.latency_cycles = l1_res.latency_cycles + config_.dram_latency_cycles;
         resp.data = read_bus_data(addr, size);
         return resp;
     }
@@ -185,29 +165,17 @@ public:
 
         auto l1_res = l1d.access(addr, true, current_cycle);
 
-        // If L1 eviction wrote back a dirty line, forward it to L2
-        if (l1_res.evicted && l1_res.evicted_dirty && l2_cache_.get_config().is_active()) {
-            l2_cache_.access(l1_res.evicted_addr, true, current_cycle);
-        }
-
         if (l1_res.hit) {
             resp.is_l1_hit = true;
             resp.latency_cycles = l1_res.latency_cycles + (coh_act.latency_cycles > 1 ? coh_act.latency_cycles : 0);
-            return resp;
-        }
-
-        // L1D Miss on Write -> L2 Allocation
-        if (l2_cache_.get_config().is_active()) {
-            auto l2_res = l2_cache_.access(addr, true, current_cycle);
-            if (l2_res.hit) {
+        } else {
+            if (l1_res.latency_cycles >= config_.dram_latency_cycles) {
+                resp.is_dram_access = true;
+            } else {
                 resp.is_l2_hit = true;
-                resp.latency_cycles = l1_res.latency_cycles + l2_res.latency_cycles + coh_act.latency_cycles;
-                return resp;
             }
+            resp.latency_cycles = l1_res.latency_cycles + coh_act.latency_cycles;
         }
-
-        resp.is_dram_access = true;
-        resp.latency_cycles = l1_res.latency_cycles + config_.dram_latency_cycles;
         return resp;
     }
 

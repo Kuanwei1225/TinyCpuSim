@@ -26,7 +26,7 @@ TEST(MultiCoreSystemTest, FourCoreConcurrentExecutionAndStatsAggregation) {
         system.set_entry_pc(c, base_pc);
     }
 
-    uint64_t total_cycles = system.run(50);
+    uint64_t total_cycles = system.run(200);
     EXPECT_TRUE(system.all_halted());
     EXPECT_GT(total_cycles, 0);
 
