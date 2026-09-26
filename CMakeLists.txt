@@ -202,5 +202,10 @@ add_executable(exec_lsu_ubench_test tests/uarch/exec_lsu_ubench_test.cpp)
 target_link_libraries(exec_lsu_ubench_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(exec_lsu_ubench_test)
 
+# uArch ROB and Top-Down Profiler Isolated Microbenchmarks
+add_executable(rob_topdown_ubench_test tests/uarch/rob_topdown_ubench_test.cpp)
+target_link_libraries(rob_topdown_ubench_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(rob_topdown_ubench_test)
+
 
 
