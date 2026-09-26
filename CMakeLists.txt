@@ -207,5 +207,10 @@ add_executable(rob_topdown_ubench_test tests/uarch/rob_topdown_ubench_test.cpp)
 target_link_libraries(rob_topdown_ubench_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(rob_topdown_ubench_test)
 
+# uArch Cache and Memory Hierarchy Isolated Microbenchmarks
+add_executable(cache_ubench_test tests/uarch/cache_ubench_test.cpp)
+target_link_libraries(cache_ubench_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(cache_ubench_test)
+
 
 

@@ -426,6 +426,13 @@ public:
             }
         }
 
+        if (!uops.empty()) {
+            for (size_t i = 0; i < uops.size() - 1; ++i) {
+                uops[i].is_last_uop_of_macro_inst = false;
+            }
+            uops.back().is_last_uop_of_macro_inst = true;
+        }
+
         return uops;
     }
 };

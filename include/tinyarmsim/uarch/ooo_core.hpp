@@ -204,7 +204,7 @@ private:
             }
 
             committed_uops_++;
-            if (uop.type != UOpType::STORE_DATA) {
+            if (uop.is_last_uop_of_macro_inst) {
                 committed_insts_++;
             }
             if (profiler_) {

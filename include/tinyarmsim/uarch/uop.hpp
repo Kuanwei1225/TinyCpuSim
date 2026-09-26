@@ -46,6 +46,7 @@ struct UOp {
     uint32_t pc{0};                 // Instruction PC address
     uint32_t raw_inst{0};           // Raw instruction encoding
     bool is_thumb32{false};         // True if 32-bit Thumb-2 instruction
+    bool is_last_uop_of_macro_inst{true}; // True if this uop is the last uop retiring the macro-instruction
 
     UOpType type{UOpType::NOP};
     ExecutionPort target_port{ExecutionPort::PORT_0_ALU_BRANCH};
