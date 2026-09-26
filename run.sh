@@ -33,13 +33,10 @@ show_help() {
     echo "  ./run.sh list                       # List all presets and snapshots in default/, save/, sweep/"
     echo "  ./run.sh config                     # Launch interactive configuration manager TUI"
     echo ""
-    echo "Microarchitectural Experiments & Baseline Management:"
+    echo "Microarchitectural Experiments:"
     echo "  ./run.sh exp                        # Run experiment on active config (configs/current.cfg) vs baseline"
     echo "  ./run.sh exp [elf]                  # Run experiment on target ELF using active config"
     echo "  ./run.sh exp --set k=v              # Run experiment with hardware overrides (e.g. ooo=false)"
-    echo "  ./run.sh baseline list              # List all established baseline reports in reports/default/"
-    echo "  ./run.sh baseline update <elf>      # Re-simulate & update baseline report for target ELF"
-    echo "  ./run.sh baseline set <elf> <rep>   # Re-anchor baseline for target ELF to a specific report file"
     echo "  ./run.sh sweep                      # Run batch parameter sweep on configs/sweep/"
     echo ""
     echo "Catalogs & Utilities:"
@@ -53,7 +50,6 @@ show_menu() {
     print_banner
     echo "Please choose a step or action:"
     echo "  [C] Config:   Configure Active Simulation, Hardware Knobs, Presets, Save/Load"
-    echo "  [B] Baseline: Manage Baseline Reports in reports/default/ (List, Update, Re-anchor)"
     echo "  [1] Step 1:   Build Project (Release Mode)"
     echo "  [2] Step 2:   Run Full Test Suite (156+ Unit & Regression Tests)"
     echo "  [3] Step 3:   Run Component Microbenchmarks (uBench)"
@@ -64,10 +60,9 @@ show_menu() {
     echo "  [H] Help:     View Complete Command & Usage Manual"
     echo "  [0] Exit"
     echo "============================================================"
-    read -r -p "Enter choice [C, B, 1-7, H, 0]: " choice
+    read -r -p "Enter choice [C, 1-7, H, 0]: " choice
     case "${choice}" in
         c|C|config) python3 "${PROJECT_ROOT}/scripts/config.py" ;;
-        b|B|baseline) python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-list ;;
         1) "${PROJECT_ROOT}/scripts/01_build.sh" ;;
         2) "${PROJECT_ROOT}/scripts/02_run_tests.sh" ;;
         3) "${PROJECT_ROOT}/scripts/03_run_ubench.sh" all ;;
@@ -99,24 +94,6 @@ else
         list|ls)
             python3 "${PROJECT_ROOT}/scripts/config.py" list
             ;;
-        baseline|base)
-            subcmd="$1"
-            shift || true
-            case "${subcmd}" in
-                list|ls|"")
-                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-list
-                    ;;
-                update|up)
-                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-update "$@"
-                    ;;
-                set)
-                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-set "$@"
-                    ;;
-                *)
-                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-list
-                    ;;
-            esac
-            ;;
         1|build)
             "${PROJECT_ROOT}/scripts/01_build.sh" "$@"
             ;;
@@ -133,11 +110,7 @@ else
             "${PROJECT_ROOT}/scripts/05_compare_gem5.sh" "$@"
             ;;
         6|exp|experiment)
-            if [ $# -eq 0 ]; then
-                run_interactive_exp
-            else
-                python3 "${PROJECT_ROOT}/scripts/experiment.py" "$@"
-            fi
+            python3 "${PROJECT_ROOT}/scripts/experiment.py" "$@"
             ;;
         7|sweep)
             python3 "${PROJECT_ROOT}/scripts/config.py" sweep "$@"
