@@ -244,40 +244,44 @@ struct UArchConfig {
             trim_str(val);
 
             auto parse_bool = [](const std::string& v) -> bool {
-                return (v == "1" || v == "true" || v == "TRUE" || v == "yes");
+                return (v == "1" || v == "true" || v == "TRUE" || v == "yes" || v == "True");
             };
 
-            if (current_section == "global") {
+            if (current_section == "global" || current_section == "system") {
                 if (key == "num_cores") cfg.num_cores = std::stoul(val);
-                else if (key == "enable_mesi") cfg.enable_mesi_coherence = parse_bool(val);
-                else if (key == "dram_latency") cfg.dram_latency_cycles = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "enable_mesi" || key == "enable_mesi_coherence") cfg.enable_mesi_coherence = parse_bool(val);
+                else if (key == "dram_latency" || key == "dram_latency_cycles") cfg.dram_latency_cycles = static_cast<uint32_t>(std::stoul(val));
             } else if (current_section == "core") {
-                if (key == "enable_ooo") cfg.default_core.enable_ooo = parse_bool(val);
+                if (key == "enable_ooo" || key == "ooo") cfg.default_core.enable_ooo = parse_bool(val);
                 else if (key == "fetch_width") cfg.default_core.fetch_width = static_cast<uint32_t>(std::stoul(val));
                 else if (key == "decode_width") cfg.default_core.decode_width = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "rename_width") cfg.default_core.rename_width = static_cast<uint32_t>(std::stoul(val));
                 else if (key == "issue_width") cfg.default_core.issue_width = static_cast<uint32_t>(std::stoul(val));
                 else if (key == "commit_width") cfg.default_core.commit_width = static_cast<uint32_t>(std::stoul(val));
-                else if (key == "rob_size") cfg.default_core.rob_size = std::stoul(val);
-                else if (key == "rs_size") cfg.default_core.rs_size = std::stoul(val);
-                else if (key == "num_phys_regs") cfg.default_core.num_phys_regs = std::stoul(val);
-            } else if (current_section == "l1i") {
+                else if (key == "rob_size" || key == "rob") cfg.default_core.rob_size = std::stoul(val);
+                else if (key == "rs_size" || key == "rs" || key == "iq_size") cfg.default_core.rs_size = std::stoul(val);
+                else if (key == "num_phys_regs" || key == "prf") cfg.default_core.num_phys_regs = std::stoul(val);
+            } else if (current_section == "l1i" || current_section == "cache_l1i") {
                 if (key == "enabled") cfg.default_core.l1i.enabled = parse_bool(val);
-                else if (key == "size_bytes") cfg.default_core.l1i.size_bytes = std::stoul(val);
+                else if (key == "size_bytes" || key == "size") cfg.default_core.l1i.size_bytes = std::stoul(val);
                 else if (key == "line_size") cfg.default_core.l1i.line_size = std::stoul(val);
-                else if (key == "associativity") cfg.default_core.l1i.associativity = std::stoul(val);
-                else if (key == "hit_latency") cfg.default_core.l1i.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
-            } else if (current_section == "l1d") {
+                else if (key == "associativity" || key == "assoc") cfg.default_core.l1i.associativity = std::stoul(val);
+                else if (key == "hit_latency" || key == "hit_latency_cycles") cfg.default_core.l1i.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "mshr_entries") cfg.default_core.l1i.mshr_entries = std::stoul(val);
+            } else if (current_section == "l1d" || current_section == "cache_l1d") {
                 if (key == "enabled") cfg.default_core.l1d.enabled = parse_bool(val);
-                else if (key == "size_bytes") cfg.default_core.l1d.size_bytes = std::stoul(val);
+                else if (key == "size_bytes" || key == "size") cfg.default_core.l1d.size_bytes = std::stoul(val);
                 else if (key == "line_size") cfg.default_core.l1d.line_size = std::stoul(val);
-                else if (key == "associativity") cfg.default_core.l1d.associativity = std::stoul(val);
-                else if (key == "hit_latency") cfg.default_core.l1d.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
-            } else if (current_section == "l2") {
+                else if (key == "associativity" || key == "assoc") cfg.default_core.l1d.associativity = std::stoul(val);
+                else if (key == "hit_latency" || key == "hit_latency_cycles") cfg.default_core.l1d.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "mshr_entries") cfg.default_core.l1d.mshr_entries = std::stoul(val);
+            } else if (current_section == "l2" || current_section == "cache_l2") {
                 if (key == "enabled") cfg.l2_shared.enabled = parse_bool(val);
-                else if (key == "size_bytes") cfg.l2_shared.size_bytes = std::stoul(val);
+                else if (key == "size_bytes" || key == "size") cfg.l2_shared.size_bytes = std::stoul(val);
                 else if (key == "line_size") cfg.l2_shared.line_size = std::stoul(val);
-                else if (key == "associativity") cfg.l2_shared.associativity = std::stoul(val);
-                else if (key == "hit_latency") cfg.l2_shared.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "associativity" || key == "assoc") cfg.l2_shared.associativity = std::stoul(val);
+                else if (key == "hit_latency" || key == "hit_latency_cycles") cfg.l2_shared.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "mshr_entries") cfg.l2_shared.mshr_entries = std::stoul(val);
             } else if (current_section == "branch_predictor") {
                 if (key == "enabled") cfg.default_core.branch_predictor.enabled = parse_bool(val);
                 else if (key == "type") {
@@ -286,12 +290,21 @@ struct UArchConfig {
                     else if (val == "GSHARE" || val == "gshare") cfg.default_core.branch_predictor.type = PredictorType::GSHARE;
                     else if (val == "TAGE" || val == "tage") cfg.default_core.branch_predictor.type = PredictorType::TAGE;
                 } else if (key == "table_size") cfg.default_core.branch_predictor.table_size = std::stoul(val);
+                else if (key == "btb_size") cfg.default_core.branch_predictor.btb_size = std::stoul(val);
+                else if (key == "ras_size") cfg.default_core.branch_predictor.ras_size = std::stoul(val);
+                else if (key == "tage_tables") cfg.default_core.branch_predictor.tage_tables = std::stoul(val);
             } else if (current_section == "lsu") {
                 if (key == "enabled") cfg.default_core.lsu.enabled = parse_bool(val);
                 else if (key == "lq_size") cfg.default_core.lsu.lq_size = std::stoul(val);
                 else if (key == "sq_size") cfg.default_core.lsu.sq_size = std::stoul(val);
-                else if (key == "enable_forwarding") cfg.default_core.lsu.enable_store_forwarding = parse_bool(val);
+                else if (key == "enable_forwarding" || key == "enable_store_forwarding") cfg.default_core.lsu.enable_store_forwarding = parse_bool(val);
+                else if (key == "enable_speculative_load") cfg.default_core.lsu.enable_speculative_load = parse_bool(val);
+                else if (key == "store_forward_latency") cfg.default_core.lsu.store_forward_latency = static_cast<uint32_t>(std::stoul(val));
             }
+        }
+
+        if (cfg.num_cores > 1 && cfg.cores.empty()) {
+            cfg.cores.resize(cfg.num_cores, cfg.default_core);
         }
 
         cfg.validate();

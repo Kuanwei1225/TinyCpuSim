@@ -20,6 +20,7 @@ PARAM_CATALOG = {
     "core": {
         "description": "Superscalar Out-of-Order Pipeline & Execution Core",
         "params": {
+            "enable_ooo": {"default": "true", "type": "bool", "desc": "Out-of-Order engine (true=OoO Tomasulo/ROB, false=In-Order)"},
             "fetch_width": {"default": 4, "type": "int", "desc": "Instruction fetch width per cycle"},
             "decode_width": {"default": 4, "type": "int", "desc": "Instruction decode width per cycle"},
             "rename_width": {"default": 4, "type": "int", "desc": "Register renaming width per cycle"},
@@ -54,6 +55,7 @@ PARAM_CATALOG = {
     "cache_l1i": {
         "description": "L1 Instruction Cache",
         "params": {
+            "enabled": {"default": "true", "type": "bool", "desc": "Enable L1 Instruction cache"},
             "size_bytes": {"default": 32768, "type": "bytes (e.g. 16KB, 32KB, 64KB)", "desc": "L1I total capacity in bytes"},
             "associativity": {"default": 4, "type": "int (e.g. 2, 4, 8)", "desc": "L1I N-way set associativity"},
             "line_size": {"default": 64, "type": "bytes", "desc": "L1I cache block size in bytes"},
@@ -64,6 +66,7 @@ PARAM_CATALOG = {
     "cache_l1d": {
         "description": "L1 Data Cache",
         "params": {
+            "enabled": {"default": "true", "type": "bool", "desc": "Enable L1 Data cache"},
             "size_bytes": {"default": 32768, "type": "bytes (e.g. 16KB, 32KB, 64KB)", "desc": "L1D total capacity in bytes"},
             "associativity": {"default": 4, "type": "int (e.g. 2, 4, 8)", "desc": "L1D N-way set associativity"},
             "line_size": {"default": 64, "type": "bytes", "desc": "L1D cache block size in bytes"},
@@ -74,6 +77,7 @@ PARAM_CATALOG = {
     "cache_l2": {
         "description": "Shared L2 Cache Subsystem",
         "params": {
+            "enabled": {"default": "true", "type": "bool", "desc": "Enable shared L2 cache"},
             "size_bytes": {"default": 524288, "type": "bytes (e.g. 256KB, 512KB, 1MB)", "desc": "Shared L2 total capacity in bytes"},
             "associativity": {"default": 8, "type": "int (e.g. 4, 8, 16)", "desc": "Shared L2 N-way set associativity"},
             "hit_latency_cycles": {"default": 10, "type": "int", "desc": "L2 hit latency in clock cycles"},
@@ -103,6 +107,9 @@ ELF_CATALOG = {
 
 # Parameter Aliases for Quick CLI Use
 PARAM_ALIASES = {
+    "ooo": ("core", "enable_ooo"),
+    "enable_ooo": ("core", "enable_ooo"),
+    "in_order": ("core", "enable_ooo"),
     "width": ("core", "issue_width"),
     "fetch_width": ("core", "fetch_width"),
     "decode_width": ("core", "decode_width"),
@@ -119,6 +126,9 @@ PARAM_ALIASES = {
     "bp": ("branch_predictor", "type"),
     "bp_type": ("branch_predictor", "type"),
     "bpu": ("branch_predictor", "type"),
+    "bp_enabled": ("branch_predictor", "enabled"),
+    "branch_enabled": ("branch_predictor", "enabled"),
+    "bpu_enabled": ("branch_predictor", "enabled"),
     "btb": ("branch_predictor", "btb_size"),
     "btb_size": ("branch_predictor", "btb_size"),
     "ras": ("branch_predictor", "ras_size"),
@@ -383,7 +393,13 @@ def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sim_bin = os.path.join(root_dir, "build", "tinycpusim")
     fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
-    base_cfg = args.config if args.config else os.path.join(root_dir, "configs", "ooo_medium.cfg")
+    reports_dir = os.path.join(root_dir, "reports")
+    os.makedirs(reports_dir, exist_ok=True)
+
+    default_base = os.path.join(root_dir, "configs", "default", "default.cfg")
+    if not os.path.exists(default_base):
+        default_base = os.path.join(root_dir, "configs", "current.cfg")
+    base_cfg = args.config if args.config else default_base
 
     if not os.path.exists(sim_bin):
         print(f"Simulator binary not found. Running build first...")
@@ -455,11 +471,18 @@ def main():
             # 3. Print Comparison
             print_comparison_table(elf_path, changed_params, base_stats, exp_stats)
             
-            if args.output:
-                with open(args.output, 'a') as f_out:
-                    f_out.write(f"\n=== Experiment: {os.path.basename(elf_path)} ===\n")
-                    f_out.write(full_log)
-                print(f"  Report appended to: {args.output}")
+            out_file = args.output
+            if not out_file:
+                import datetime
+                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                base_name = os.path.basename(elf_path).replace('.elf', '')
+                out_file = os.path.join(reports_dir, f"exp_{base_name}_{ts}.txt")
+
+            with open(out_file, 'a') as f_out:
+                f_out.write(f"\n=== Experiment: {os.path.basename(elf_path)} ===\n")
+                f_out.write(f"Baseline Config: {base_cfg}\n")
+                f_out.write(full_log)
+            print(f"  Full performance log written to: \033[1;36m{out_file}\033[0m")
 
     finally:
         if os.path.exists(exp_cfg):

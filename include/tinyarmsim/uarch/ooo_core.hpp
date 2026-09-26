@@ -546,7 +546,7 @@ private:
 
     void stage_issue() {
         uint32_t issue_width = config_.issue_width > 0 ? config_.issue_width : 4;
-        issued_uops_ = iq_.select_and_issue(issue_width);
+        issued_uops_ = iq_.select_and_issue(issue_width, config_.enable_ooo);
         if (debug_ && !issued_uops_.empty()) {
             std::cout << " [ISSUE] Issued " << issued_uops_.size() << " uops" << std::endl;
             for (const auto& u : issued_uops_) {

@@ -232,29 +232,56 @@ public:
         }
     }
 
-    // Select up to max_issue ready uOps (oldest-first priority)
-    [[nodiscard]] std::vector<UOp> select_and_issue(uint32_t max_issue) {
-        std::vector<size_t> ready_indices;
-        for (size_t i = 0; i < entries_.size(); ++i) {
-            if (entries_[i].valid) {
-                const auto& uop = entries_[i].uop;
-                if (uop.src1_ready && uop.src2_ready && uop.src3_ready && uop.flags_src_ready) {
-                    ready_indices.push_back(i);
+    // Select up to max_issue ready uOps (oldest-first priority, strict in-order if enable_ooo is false)
+    [[nodiscard]] std::vector<UOp> select_and_issue(uint32_t max_issue, bool enable_ooo = true) {
+        if (enable_ooo) {
+            std::vector<size_t> ready_indices;
+            for (size_t i = 0; i < entries_.size(); ++i) {
+                if (entries_[i].valid) {
+                    const auto& uop = entries_[i].uop;
+                    if (uop.src1_ready && uop.src2_ready && uop.src3_ready && uop.flags_src_ready) {
+                        ready_indices.push_back(i);
+                    }
                 }
             }
-        }
-        std::sort(ready_indices.begin(), ready_indices.end(), [this](size_t a, size_t b) {
-            return entries_[a].uop.seq_num < entries_[b].uop.seq_num;
-        });
+            std::sort(ready_indices.begin(), ready_indices.end(), [this](size_t a, size_t b) {
+                return entries_[a].uop.seq_num < entries_[b].uop.seq_num;
+            });
 
-        std::vector<UOp> issued;
-        for (size_t idx : ready_indices) {
-            issued.push_back(entries_[idx].uop);
-            entries_[idx].valid = false;
-            count_--;
-            if (issued.size() >= max_issue) break;
+            std::vector<UOp> issued;
+            for (size_t idx : ready_indices) {
+                issued.push_back(entries_[idx].uop);
+                entries_[idx].valid = false;
+                count_--;
+                if (issued.size() >= max_issue) break;
+            }
+            return issued;
+        } else {
+            // Strict In-Order Issue: Check instructions in seq_num order
+            std::vector<size_t> valid_indices;
+            for (size_t i = 0; i < entries_.size(); ++i) {
+                if (entries_[i].valid) {
+                    valid_indices.push_back(i);
+                }
+            }
+            std::sort(valid_indices.begin(), valid_indices.end(), [this](size_t a, size_t b) {
+                return entries_[a].uop.seq_num < entries_[b].uop.seq_num;
+            });
+
+            std::vector<UOp> issued;
+            for (size_t idx : valid_indices) {
+                const auto& uop = entries_[idx].uop;
+                // If the oldest unissued uop is not ready, stall the entire issue stage (in-order dependency)
+                if (!(uop.src1_ready && uop.src2_ready && uop.src3_ready && uop.flags_src_ready)) {
+                    break;
+                }
+                issued.push_back(entries_[idx].uop);
+                entries_[idx].valid = false;
+                count_--;
+                if (issued.size() >= max_issue) break;
+            }
+            return issued;
         }
-        return issued;
     }
 
     // Flush all squashed uOps matching sequence condition
