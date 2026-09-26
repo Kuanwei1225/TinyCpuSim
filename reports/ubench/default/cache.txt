@@ -2,32 +2,42 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       Cache Hierarchy & MESI (cache)
-  Generation Timestamp:  2026-09-26 23:53:27
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/current.cfg
-  Workload Benchmark:    test_mem_stride.elf
+  Generation Timestamp:  2026-09-27 00:12:31
+  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Representative ELF:    test_mem_stride.elf
   Test Pass Count:       6 / 6
 --------------------------------------------------------------------------------
-  Top Microarchitecture Metrics:
-    • cycles: 121
-    • ipc: 2.124
+  Top Microarchitecture Hardware Metrics:
+    • cycles: 139
+    • ipc: 1.849
+    • insts: 257
+    • uops: 289
     • branch_acc: 90.2
     • branch_mispredicts: 4
     • btb_hit_rate: 0.0
-    • l1i_hit_rate: 99.69
+    • ras_hit_rate: 0.0
+    • l1i_hit_rate: 99.73
     • l1d_hit_rate: 92.68
+    • l2_hit_rate: 0.0
     • store_forwards: 0
-    • rs_stalls: 0
+    • forwarding_rate: 0.0
+    • rs_stalls: 47
     • rob_stalls: 0
-    • retiring: 100.0
-    • backend_bound: 0.0
+    • prf_stalls: 0
+    • head_rob_stalls: 0
+    • retiring: 86.01
+    • bad_spec: 0.0
+    • frontend_bound: 0.0
+    • backend_bound: 13.99
+    • l1d_mshr_stalls: 0
 --------------------------------------------------------------------------------
   Detailed Microbenchmark Test Cases:
-  • Cache_UBench_L1HitLatencyAndThroughput         | Hit Latency: 1 cyc      | [Optimal] 1-cycle L1 cache access latency & line refill
-  • Cache_UBench_MshrNonBlockingAllocation         | MSHR Concurrency: 8 misses   | [Optimal] 8 outstanding non-blocking cache misses in flight
-  • Cache_UBench_MesiCoherenceStateTransitions     | MESI Transitions: Verified   | [Optimal] Modified, Exclusive, Shared, Invalid state transitions
-  • Cache_UBench_WriteBackDirtyEviction            | Writeback Integrity: 100%       | [Optimal] Dirty cache line write-back to L2/DRAM on eviction
-  • Cache_UBench_SharedL2HierarchicalInclusion     | Inclusion Check: 100%       | [Optimal] L2 inclusive cache tag lookups & L1 invalidate
-  • Cache_UBench_LruReplacementSetAssociativity    | Eviction Cycles: 10 cyc     | [Stress/Bottleneck] 4-way LRU set replacement eviction correctness
+  • Cache_UBench_L1HitLatencyAndThroughput         | Hit Latency: 1.0 cyc     | [Stress/Bottleneck] 1-cycle L1 cache access latency & line refill
+  • Cache_UBench_MshrNonBlockingAllocation         | MSHR Concurrency: 8.0 misses  | [Optimal] 8 outstanding non-blocking cache misses in flight
+  • Cache_UBench_MesiCoherenceStateTransitions     | MESI Transitions: 100.0%        | [Optimal] Modified, Exclusive, Shared, Invalid state transitions
+  • Cache_UBench_WriteBackDirtyEviction            | Writeback Integrity: 100.0%        | [Optimal] Dirty cache line write-back to L2/DRAM on eviction
+  • Cache_UBench_SharedL2HierarchicalInclusion     | Inclusion Check: 100.0%        | [Optimal] L2 inclusive cache tag lookups & L1 invalidate
+  • Cache_UBench_LruReplacementSetAssociativity    | Eviction Cycles: 10.0 cyc     | [Stress/Bottleneck] 4-way LRU set replacement eviction correctness
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
@@ -41,8 +51,8 @@ Starting simulation...
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 257
-Elapsed Time:       0.000040 s
-Simulation Speed:   6431753.34 inst/s (6.43 MIPS)
+Elapsed Time:       0.000027 s
+Simulation Speed:   9359749.44 inst/s (9.36 MIPS)
 ============================================================
 
 
@@ -50,25 +60,25 @@ Simulation Speed:   6431753.34 inst/s (6.43 MIPS)
                TinyCpuSim uArch Simulation Report           
 ============================================================
 Simulated Target Clock:    1000.00 MHz
-Simulated Target Time:     1.2100e-07 s
-Simulated Total Cycles:    121 ticks
+Simulated Target Time:     1.3900e-07 s
+Simulated Total Cycles:    139 ticks
 Total Committed Insts:     257
 Total Committed uOps:      289
-Aggregate Throughput (IPC):2.124 inst/cycle (uOp IPC: 2.388)
+Aggregate Throughput (IPC):1.849 inst/cycle (uOp IPC: 2.079)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.000040 s
-  Simulation Speed:        3.03 M-Ticks/s
-  Simulation MIPS:         6.43 MIPS
-  Simulation Slowdown:     330.2x
+  Host Wall-Clock Time:    0.000027 s
+  Simulation Speed:        5.06 M-Ticks/s
+  Simulation MIPS:         9.36 MIPS
+  Simulation Slowdown:     197.5x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  257 / 289 (uOp Ratio: 1.12x)
-  Core Throughput (IPC):   2.124 inst/cycle
+  Core Throughput (IPC):   1.849 inst/cycle
   Branch Predictions:      41 (Accuracy: 90.2%)
   Branch Mispredicts:      4 (Penalty Flushes: 4)
-  L1I Cache Hit Rate:      99.69% (322/323)
+  L1I Cache Hit Rate:      99.73% (363/364)
   L1D Cache Hit Rate:      92.68% (38/41)
   Loads / Stores:          9 / 32
   Store-to-Load Forwards:  0 (Rate: 0.00%)
@@ -76,8 +86,8 @@ Active Core Count:         1
   --- Top-Down Breakdown (Level 1) ---
     Frontend Bound:        0.00%
     Bad Speculation:       0.00%
-    Backend Bound:         0.00%
-    Retiring:              100.00%
+    Backend Bound:         13.99%
+    Retiring:              86.01%
   --- Detailed Execution Ports ---
     Port ALU uOps:         188
     Port MUL uOps:         0
@@ -86,7 +96,7 @@ Active Core Count:         1
     Port LSU uOps:         74
   --- Pipeline Stalls Breakdown ---
     ROB Full Stalls:       0 cycles
-    RS/IQ Full Stalls:     0 cycles
+    RS/IQ Full Stalls:     47 cycles
     PRF Exhaustion Stalls: 0 cycles
     LQ / SQ Full Stalls:   0 / 0 cycles
     Head-of-ROB Stalls:    0 cycles
@@ -112,7 +122,7 @@ Active Core Count:         1
     Retiring Mem:          73 slots
     FE L1I Miss:           0 slots
     FE Fetch Bubbles:      0 slots
-    BE Core RS Full:       0 slots
+    BE Core RS Full:       47 slots
     BE Core ROB Full:      0 slots
     BE Core FreeList Empty:0 slots
     BE Mem L1D Miss:       0 slots

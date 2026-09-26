@@ -2,37 +2,47 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       ROB & Top-Down TMAM (rob)
-  Generation Timestamp:  2026-09-26 23:53:27
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/current.cfg
-  Workload Benchmark:    test_stress.elf
+  Generation Timestamp:  2026-09-27 00:12:31
+  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Representative ELF:    test_stress.elf
   Test Pass Count:       11 / 11
 --------------------------------------------------------------------------------
-  Top Microarchitecture Metrics:
+  Top Microarchitecture Hardware Metrics:
     • cycles: 80013
     • ipc: 1.5
+    • insts: 120012
+    • uops: 130012
     • branch_acc: 100.0
     • branch_mispredicts: 2
     • btb_hit_rate: 0.0
+    • ras_hit_rate: 0.0
     • l1i_hit_rate: 100.0
     • l1d_hit_rate: 99.98
+    • l2_hit_rate: 0.0
     • store_forwards: 10000
-    • rs_stalls: 1
-    • rob_stalls: 79942
+    • forwarding_rate: 99.98
+    • rs_stalls: 5
+    • rob_stalls: 79950
+    • prf_stalls: 0
+    • head_rob_stalls: 0
     • retiring: 61.92
+    • bad_spec: 0.0
+    • frontend_bound: 0.0
     • backend_bound: 38.08
+    • l1d_mshr_stalls: 0
 --------------------------------------------------------------------------------
   Detailed Microbenchmark Test Cases:
-  • TopDown_UBench_SlotConservationInvariant       | Slot Conservation: 100.00%    | [Optimal] Frontend + Backend + BadSpec + Retiring == 100%
+  • TopDown_UBench_SlotConservationInvariant       | Slot Conservation: 100.0%        | [Optimal] Frontend + Backend + BadSpec + Retiring == 100%
   • ROB_UBench_SustainedRetireThroughput           | Retire Width: 4.0 uop/cyc | [Optimal] 4-wide sustained retirement throughput saturation
-  • ROB_UBench_SpeculativeStoreDrainOnRetire       | Drain Rate: 100%       | [Optimal] Speculative store commits and drains to memory bus
-  • ROB_UBench_CircularBufferWrapAroundStress      | Pointer Integrity: 100%       | [Optimal] Head/tail pointer 64-entry wrap around stress
-  • TopDown_UBench_FrontendVsBackendBreakdown      | Attribution Acc: 100%       | [Optimal] Fetch stall vs execution stall slot attribution
-  • TopDown_UBench_BadSpeculationAccounting        | Squash Attribution: 100%       | [Optimal] Squashed speculative issue slot accounting
-  • ROB_UBench_RoiBoundaryResetStats               | ROI Precision: Exact      | [Optimal] Dynamic m5ops ROI performance counter reset & dump
-  • TopDown_UBench_BottleneckParetoRanking         | Ranking Acc: 100%       | [Optimal] Automated Pareto bottleneck ranking generator
-  • ROB_UBench_IsYoungerCircularAgeDistance        | Age Ordering: Exact      | [Optimal] Modulo circular index age comparison correctness
-  • ROB_UBench_MultipleBranchMispredictFlushes     | Squash Cleanliness: 100%       | [Optimal] Back-to-back branch misprediction squashes
-  • ROB_UBench_HeadOfRobBlockingRetire             | Head Block Stalls: 25 cyc     | [Stress/Bottleneck] Uncompleted head-of-ROB instruction blocking retire
+  • ROB_UBench_SpeculativeStoreDrainOnRetire       | Drain Rate: 100.0%        | [Optimal] Speculative store commits and drains to memory bus
+  • ROB_UBench_CircularBufferWrapAroundStress      | Pointer Integrity: 100.0%        | [Optimal] Head/tail pointer 64-entry wrap around stress
+  • TopDown_UBench_FrontendVsBackendBreakdown      | Attribution Acc: 100.0%        | [Optimal] Fetch stall vs execution stall slot attribution
+  • TopDown_UBench_BadSpeculationAccounting        | Squash Attribution: 100.0%        | [Optimal] Squashed speculative issue slot accounting
+  • ROB_UBench_RoiBoundaryResetStats               | ROI Precision: 100.0%        | [Optimal] Dynamic m5ops ROI performance counter reset & dump
+  • TopDown_UBench_BottleneckParetoRanking         | Ranking Acc: 100.0%        | [Optimal] Automated Pareto bottleneck ranking generator
+  • ROB_UBench_IsYoungerCircularAgeDistance        | Age Ordering: 100.0%        | [Optimal] Modulo circular index age comparison correctness
+  • ROB_UBench_MultipleBranchMispredictFlushes     | Squash Cleanliness: 100.0%        | [Optimal] Back-to-back branch misprediction squashes
+  • ROB_UBench_HeadOfRobBlockingRetire             | Head Block Stalls: 25.0 cyc     | [Stress/Bottleneck] Uncompleted head-of-ROB instruction blocking retire
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
@@ -46,8 +56,8 @@ Starting simulation...
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 120012
-Elapsed Time:       0.001306 s
-Simulation Speed:   91869377.87 inst/s (91.87 MIPS)
+Elapsed Time:       0.001378 s
+Simulation Speed:   87115143.82 inst/s (87.12 MIPS)
 ============================================================
 
 
@@ -63,17 +73,17 @@ Aggregate Throughput (IPC):1.500 inst/cycle (uOp IPC: 1.625)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.001306 s
-  Simulation Speed:        61.25 M-Ticks/s
-  Simulation MIPS:         91.87 MIPS
-  Simulation Slowdown:     16.3x
+  Host Wall-Clock Time:    0.001378 s
+  Simulation Speed:        58.08 M-Ticks/s
+  Simulation MIPS:         87.12 MIPS
+  Simulation Slowdown:     17.2x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  120012 / 130012 (uOp Ratio: 1.08x)
   Core Throughput (IPC):   1.500 inst/cycle
   Branch Predictions:      10000 (Accuracy: 100.0%)
   Branch Mispredicts:      2 (Penalty Flushes: 2)
-  L1I Cache Hit Rate:      100.00% (120038/120039)
+  L1I Cache Hit Rate:      100.00% (120050/120051)
   L1D Cache Hit Rate:      99.98% (10000/10002)
   Loads / Stores:          10002 / 10000
   Store-to-Load Forwards:  10000 (Rate: 99.98%)
@@ -88,10 +98,10 @@ Active Core Count:         1
     Port MUL uOps:         0
     Port DIV uOps:         0
     Port Branch uOps:      10000
-    Port LSU uOps:         339878
+    Port LSU uOps:         219940
   --- Pipeline Stalls Breakdown ---
-    ROB Full Stalls:       79942 cycles
-    RS/IQ Full Stalls:     1 cycles
+    ROB Full Stalls:       79950 cycles
+    RS/IQ Full Stalls:     5 cycles
     PRF Exhaustion Stalls: 0 cycles
     LQ / SQ Full Stalls:   0 / 0 cycles
     Head-of-ROB Stalls:    0 cycles
@@ -117,8 +127,8 @@ Active Core Count:         1
     Retiring Mem:          30002 slots
     FE L1I Miss:           0 slots
     FE Fetch Bubbles:      0 slots
-    BE Core RS Full:       1 slots
-    BE Core ROB Full:      79942 slots
+    BE Core RS Full:       5 slots
+    BE Core ROB Full:      79950 slots
     BE Core FreeList Empty:0 slots
     BE Mem L1D Miss:       0 slots
     BE Mem MSHR Full:      0 slots

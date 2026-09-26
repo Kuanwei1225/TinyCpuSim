@@ -2,38 +2,48 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       BPU & Frontend (bpu)
-  Generation Timestamp:  2026-09-26 23:53:27
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/current.cfg
-  Workload Benchmark:    test_branch_pred.elf
+  Generation Timestamp:  2026-09-27 00:12:31
+  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Representative ELF:    test_branch_pred.elf
   Test Pass Count:       12 / 12
 --------------------------------------------------------------------------------
-  Top Microarchitecture Metrics:
+  Top Microarchitecture Hardware Metrics:
     • cycles: 1528
     • ipc: 0.988
+    • insts: 1510
+    • uops: 1510
     • branch_acc: 85.2
     • branch_mispredicts: 104
     • btb_hit_rate: 0.0
+    • ras_hit_rate: 0.0
     • l1i_hit_rate: 99.98
     • l1d_hit_rate: 0.0
+    • l2_hit_rate: 0.0
     • store_forwards: 0
+    • forwarding_rate: 0.0
     • rs_stalls: 0
     • rob_stalls: 0
+    • prf_stalls: 0
+    • head_rob_stalls: 0
     • retiring: 100.0
+    • bad_spec: 0.0
+    • frontend_bound: 0.0
     • backend_bound: 0.0
+    • l1d_mshr_stalls: 0
 --------------------------------------------------------------------------------
   Detailed Microbenchmark Test Cases:
-  • BPU_UBench_TightLoopAlwaysTaken                | Direction Acc: 100.0%     | [Optimal] Loop branch saturation & steady-state 100% accuracy
-  • BPU_UBench_DeepNestedCallReturnRAS             | RAS Hit Rate: 100.0%     | [Optimal] Call/Return stack prediction up to 16 depths
-  • BPU_UBench_CorrelatedBranchesTAGE              | TAGE Accuracy: 97.5%      | [Optimal] Multi-table TAGE geometric history correlation
-  • BPU_UBench_AlternatingPatternTNTN              | History Acc: 92.5%      | [Optimal] GShare global history pattern correlation
-  • Frontend_UBench_MultiUopExpansionThroughput    | Decode Width: 4 uOp/cyc  | [Optimal] 32-bit Thumb / LDM multi-uOp decode expansion
-  • Frontend_UBench_SpeculativeCheckpointRestore   | Restore Latency: 0 cyc      | [Optimal] Branch misprediction RAT snapshot restore
-  • Frontend_UBench_CrossCacheLineFetch            | Fetch Throughput: 4 uOp/cyc  | [Optimal] Unaligned multi-word instruction boundary fetch
-  • Frontend_UBench_FlagsRenamingWakeup            | Wakeup Latency: 1 cyc      | [Optimal] NZCV flags condition code dependency renaming
-  • Frontend_UBench_PrfExhaustionStall             | Recovery Latency: 1 cyc      | [Optimal] Physical register file freelist starvation stall
-  • Frontend_UBench_DecoderIllegalOpcodeFault      | Fault Precision: 100%       | [Optimal] Undefined instruction precise fault detection
-  • BPU_UBench_IndirectCallTargetThrashing         | BTB Hit Rate: 42.1%      | [Stress/Bottleneck] Polymorphic indirect branch target switching
-  • BPU_UBench_BranchTargetBufferAliasStress       | BTB Alias Stalls: 328 cyc    | [Stress/Bottleneck] BTB hash collision & capacity stress
+  • BPU_UBench_TightLoopAlwaysTaken                | Direction Acc: 100.0%        | [Optimal] Loop branch saturation & steady-state 100% accuracy
+  • BPU_UBench_DeepNestedCallReturnRAS             | RAS Hit Rate: 100.0%        | [Optimal] Call/Return stack prediction up to 16 depths
+  • BPU_UBench_CorrelatedBranchesTAGE              | TAGE Accuracy: 97.5%        | [Optimal] Multi-table TAGE geometric history correlation
+  • BPU_UBench_AlternatingPatternTNTN              | History Acc: 92.5%        | [Optimal] GShare global history pattern correlation
+  • Frontend_UBench_MultiUopExpansionThroughput    | Decode Width: 4.0 uOp/cyc | [Optimal] 32-bit Thumb / LDM multi-uOp decode expansion
+  • Frontend_UBench_SpeculativeCheckpointRestore   | Restore Latency: 0.0 cyc     | [Stress/Bottleneck] Branch misprediction RAT snapshot restore
+  • Frontend_UBench_CrossCacheLineFetch            | Fetch Throughput: 4.0 uOp/cyc | [Optimal] Unaligned multi-word instruction boundary fetch
+  • Frontend_UBench_FlagsRenamingWakeup            | Wakeup Latency: 1.0 cyc     | [Stress/Bottleneck] NZCV flags condition code dependency renaming
+  • Frontend_UBench_PrfExhaustionStall             | Recovery Latency: 1.0 cyc     | [Stress/Bottleneck] Physical register file freelist starvation stall
+  • Frontend_UBench_DecoderIllegalOpcodeFault      | Fault Precision: 100.0%        | [Optimal] Undefined instruction precise fault detection
+  • BPU_UBench_IndirectCallTargetThrashing         | BTB Hit Rate: 42.1%        | [Optimal] Polymorphic indirect branch target switching
+  • BPU_UBench_BranchTargetBufferAliasStress       | BTB Alias Stalls: 328.0 cyc     | [Stress/Bottleneck] BTB hash collision & capacity stress
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
@@ -47,8 +57,8 @@ Starting simulation...
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 1510
-Elapsed Time:       0.000062 s
-Simulation Speed:   24420616.82 inst/s (24.42 MIPS)
+Elapsed Time:       0.000090 s
+Simulation Speed:   16715743.80 inst/s (16.72 MIPS)
 ============================================================
 
 
@@ -64,17 +74,17 @@ Aggregate Throughput (IPC):0.988 inst/cycle (uOp IPC: 0.988)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.000062 s
-  Simulation Speed:        24.71 M-Ticks/s
-  Simulation MIPS:         24.42 MIPS
-  Simulation Slowdown:     40.5x
+  Host Wall-Clock Time:    0.000090 s
+  Simulation Speed:        16.92 M-Ticks/s
+  Simulation MIPS:         16.72 MIPS
+  Simulation Slowdown:     59.1x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  1510 / 1510 (uOp Ratio: 1.00x)
   Core Throughput (IPC):   0.988 inst/cycle
   Branch Predictions:      703 (Accuracy: 85.2%)
   Branch Mispredicts:      104 (Penalty Flushes: 104)
-  L1I Cache Hit Rate:      99.98% (4749/4750)
+  L1I Cache Hit Rate:      99.98% (4752/4753)
   L1D Cache Hit Rate:      0.00% (0/0)
   Loads / Stores:          0 / 0
   Store-to-Load Forwards:  0 (Rate: 0.00%)
@@ -85,7 +95,7 @@ Active Core Count:         1
     Backend Bound:         0.00%
     Retiring:              100.00%
   --- Detailed Execution Ports ---
-    Port ALU uOps:         1905
+    Port ALU uOps:         1906
     Port MUL uOps:         0
     Port DIV uOps:         0
     Port Branch uOps:      703

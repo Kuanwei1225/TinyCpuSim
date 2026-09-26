@@ -130,32 +130,126 @@ def diff_hardware_configs(base_path, active_path):
                 diffs.append((sec, k, v_b, v_a))
     return diffs
 
+SUITE_METRICS = {
+    "bpu": [
+        ("Simulated Total Cycles", "cycles", "", True),
+        ("Throughput (IPC)", "ipc", "", False),
+        ("Branch Predictor Accuracy", "branch_acc", "%", False),
+        ("Branch Mispredict Penalty Flushes", "branch_mispredicts", "", True),
+        ("BTB Target Hit Rate", "btb_hit_rate", "%", False),
+        ("RAS Return Hit Rate", "ras_hit_rate", "%", False),
+        ("Front-End Bound (Fetch/BPU)", "frontend_bound", "%", True),
+        ("Bad Speculation (Squashed)", "bad_spec", "%", True),
+        ("Retiring (Useful Work)", "retiring", "%", False),
+    ],
+    "exec": [
+        ("Simulated Total Cycles", "cycles", "", True),
+        ("Throughput (IPC)", "ipc", "", False),
+        ("Issue Queue (RS) Full Stalls", "rs_stalls", " cyc", True),
+        ("Store-to-Load Bypass Rate", "forwarding_rate", "%", False),
+        ("ROB Full Stalls", "rob_stalls", " cyc", True),
+        ("L1D Cache Hit Rate", "l1d_hit_rate", "%", False),
+        ("Back-End Bound (Stalls)", "backend_bound", "%", True),
+        ("Retiring (Useful Work)", "retiring", "%", False),
+    ],
+    "rob": [
+        ("Simulated Total Cycles", "cycles", "", True),
+        ("Throughput (IPC)", "ipc", "", False),
+        ("ROB Full Stalls", "rob_stalls", " cyc", True),
+        ("Head-of-ROB Stalls", "head_rob_stalls", " cyc", True),
+        ("PRF FreeList Exhaustion Stalls", "prf_stalls", " cyc", True),
+        ("Retiring (Useful Work)", "retiring", "%", False),
+        ("Bad Speculation (Squashed)", "bad_spec", "%", True),
+        ("Back-End Bound (Stalls)", "backend_bound", "%", True),
+    ],
+    "cache": [
+        ("Simulated Total Cycles", "cycles", "", True),
+        ("Throughput (IPC)", "ipc", "", False),
+        ("L1I Cache Hit Rate", "l1i_hit_rate", "%", False),
+        ("L1D Cache Hit Rate", "l1d_hit_rate", "%", False),
+        ("Shared L2 Cache Hit Rate", "l2_hit_rate", "%", False),
+        ("L1D MSHR Saturation Stalls", "l1d_mshr_stalls", " cyc", True),
+        ("Back-End Bound (Mem Stalls)", "backend_bound", "%", True),
+    ]
+}
+
+def format_row(label, v_base, v_exp, unit="", lower_better=False):
+    delta_str = "---"
+    if isinstance(v_base, (int, float)) and isinstance(v_exp, (int, float)):
+        if v_base > 0:
+            delta = ((v_exp - v_base) / float(v_base)) * 100.0
+            if abs(delta) < 0.001:
+                delta_str = "0.0%"
+            else:
+                sign = "+" if delta > 0 else ""
+                # Coloring
+                if lower_better:
+                    color = "\033[1;32m" if delta < 0 else ("\033[1;31m" if delta > 0 else "")
+                else:
+                    color = "\033[1;32m" if delta > 0 else ("\033[1;31m" if delta < 0 else "")
+                delta_str = f"{color}{sign}{delta:.2f}%\033[0m"
+        elif v_base == 0 and v_exp > 0:
+            color = "\033[1;31m" if lower_better else "\033[1;32m"
+            delta_val = f"{v_exp:.2f}{unit}" if isinstance(v_exp, float) else f"{v_exp}{unit}"
+            delta_str = f"{color}+{delta_val}\033[0m"
+        elif v_base == 0 and v_exp == 0:
+            delta_str = "0.0%"
+
+    if "IPC" in label and isinstance(v_base, float):
+        fmt_base = f"{v_base:.3f}"
+        fmt_exp = f"{v_exp:.3f}" if isinstance(v_exp, float) else str(v_exp)
+    else:
+        fmt_base = f"{v_base:.2f}{unit}" if isinstance(v_base, float) else f"{v_base}{unit}" if v_base != 'N/A' and v_base is not None else 'N/A'
+        fmt_exp = f"{v_exp:.2f}{unit}" if isinstance(v_exp, float) else f"{v_exp}{unit}" if v_exp != 'N/A' and v_exp is not None else 'N/A'
+    return f"    {label:<34} | {fmt_base:<13} | {fmt_exp:<13} | {delta_str:<12}"
+
 def parse_uarch_stats(log_text):
     stats = {}
     m = re.search(r'Simulated Total Cycles:\s+(\d+)', log_text)
     if m: stats['cycles'] = int(m.group(1))
     m = re.search(r'Aggregate Throughput \(IPC\):\s*([\d\.]+)', log_text)
     if m: stats['ipc'] = float(m.group(1))
+    m = re.search(r'Total Committed Insts:\s+(\d+)', log_text)
+    if m: stats['insts'] = int(m.group(1))
+    m = re.search(r'Total Committed uOps:\s+(\d+)', log_text)
+    if m: stats['uops'] = int(m.group(1))
     m = re.search(r'Branch Predictions:\s+\d+\s+\(Accuracy:\s*([\d\.]+)%\)', log_text)
     if m: stats['branch_acc'] = float(m.group(1))
     m = re.search(r'Branch Mispredicts:\s+(\d+)', log_text)
     if m: stats['branch_mispredicts'] = int(m.group(1))
     m = re.search(r'BTB Hits / Misses:\s+\d+\s+/\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', log_text)
     if m: stats['btb_hit_rate'] = float(m.group(1))
+    m = re.search(r'RAS Hits / Misses:\s+\d+\s+/\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', log_text)
+    if m: stats['ras_hit_rate'] = float(m.group(1))
     m = re.search(r'L1I Cache Hit Rate:\s*([\d\.]+)%', log_text)
     if m: stats['l1i_hit_rate'] = float(m.group(1))
     m = re.search(r'L1D Cache Hit Rate:\s*([\d\.]+)%', log_text)
     if m: stats['l1d_hit_rate'] = float(m.group(1))
-    m = re.search(r'Store-to-Load Forwards:\s+(\d+)', log_text)
-    if m: stats['store_forwards'] = int(m.group(1))
+    m = re.search(r'L2 Hits / Misses:\s+\d+\s+/\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', log_text)
+    if m: stats['l2_hit_rate'] = float(m.group(1))
+    m = re.search(r'Store-to-Load Forwards:\s+(\d+)(?:\s+\(Rate:\s*([\d\.]+)%\))?', log_text)
+    if m:
+        stats['store_forwards'] = int(m.group(1))
+        if m.group(2): stats['forwarding_rate'] = float(m.group(2))
+        else: stats['forwarding_rate'] = 100.0 if int(m.group(1)) > 0 else 0.0
     m = re.search(r'RS/IQ Full Stalls:\s+(\d+)', log_text)
     if m: stats['rs_stalls'] = int(m.group(1))
     m = re.search(r'ROB Full Stalls:\s+(\d+)', log_text)
     if m: stats['rob_stalls'] = int(m.group(1))
+    m = re.search(r'PRF Exhaustion Stalls:\s+(\d+)', log_text)
+    if m: stats['prf_stalls'] = int(m.group(1))
+    m = re.search(r'Head-of-ROB Stalls:\s+(\d+)', log_text)
+    if m: stats['head_rob_stalls'] = int(m.group(1))
     m = re.search(r'Retiring:\s*([\d\.]+)%', log_text)
     if m: stats['retiring'] = float(m.group(1))
+    m = re.search(r'Bad Speculation:\s*([\d\.]+)%', log_text)
+    if m: stats['bad_spec'] = float(m.group(1))
+    m = re.search(r'Frontend Bound:\s*([\d\.]+)%', log_text)
+    if m: stats['frontend_bound'] = float(m.group(1))
     m = re.search(r'Backend Bound:\s*([\d\.]+)%', log_text)
     if m: stats['backend_bound'] = float(m.group(1))
+    m = re.search(r'L1D MSHR Allocations:\s+\d+\s+\(Stalls:\s*(\d+)\)', log_text)
+    if m: stats['l1d_mshr_stalls'] = int(m.group(1))
     return stats
 
 def parse_baseline_file(file_path):
@@ -331,38 +425,62 @@ def main():
         has_baseline = bool(baseline_data)
 
         pass_tag = "\033[1;32m100% HEALTHY\033[0m" if passed == total else f"\033[1;31m{passed}/{total} PASSED\033[0m"
-        cycles_str = str(sim_stats.get('cycles', 'N/A'))
-        ipc_str = f"{sim_stats.get('ipc', 0.0):.3f}" if sim_stats.get('ipc') else 'N/A'
 
-        delta_tag = ""
-        speedup_factor = 1.0
-        if has_baseline and base_stats.get('cycles') and sim_stats.get('cycles'):
-            c_b = base_stats['cycles']
-            c_e = sim_stats['cycles']
-            speedup_factor = float(c_b) / float(c_e)
-            delta_pct = ((c_e - c_b) / float(c_b)) * 100.0
-            if delta_pct < -0.01:
-                delta_tag = f" | Baseline Delta: \033[1;32m{abs(delta_pct):.1f}% FASTER (Speedup: {speedup_factor:.2f}x)\033[0m"
-            elif delta_pct > 0.01:
-                delta_tag = f" | Baseline Delta: \033[1;31m+{delta_pct:.1f}% SLOWER (Slowdown: {(1.0/speedup_factor):.2f}x)\033[0m"
-            else:
-                delta_tag = " | Baseline Delta: 0.0%"
+        print(f"\n========================================================================================")
+        print(f" [ Suite: \033[1m{suite_res['name']}\033[0m ] - {pass_tag} ({passed}/{total} Tests) | Workload: \033[1;36m{suite_res['workload_elf']}\033[0m")
+        print("========================================================================================")
 
-        print(f"\n[ Suite: \033[1m{suite_res['name']}\033[0m ] - {pass_tag} ({passed}/{total} Tests)")
-        print(f"  Representative ELF: \033[1m{suite_res['workload_elf']}\033[0m | Simulated Cycles: \033[1m{cycles_str}\033[0m (IPC: {ipc_str}){delta_tag}")
-        print("  " + "-" * 84)
+        # Print Hardware Metrics Comparison Table
+        print(f"    {'Hardware Performance Metric':<34} | {'Baseline':<13} | {'Active Run':<13} | {'Delta (%)':<12}")
+        print("    " + "-" * 78)
+        suite_metric_defs = SUITE_METRICS.get(s_key, [])
+        for label, m_key, unit, lower_better in suite_metric_defs:
+            v_b = base_stats.get(m_key, 'N/A')
+            v_e = sim_stats.get(m_key, 'N/A')
+            print(format_row(label, v_b, v_e, unit=unit, lower_better=lower_better))
+
+        # Check for degraded metrics in this suite
+        degraded_list = []
+        for label, m_key, unit, lower_better in suite_metric_defs:
+            v_b = base_stats.get(m_key)
+            v_e = sim_stats.get(m_key)
+            if isinstance(v_b, (int, float)) and isinstance(v_e, (int, float)):
+                if lower_better and v_e > v_b and abs(v_e - v_b) > 0.001:
+                    diff = v_e - v_b
+                    pct_str = f"+{((v_e - v_b) / float(v_b) * 100.0):.1f}%" if v_b > 0 else f"+{diff:.2f}{unit}"
+                    degraded_list.append((label, v_b, v_e, diff, pct_str, unit, "worsened / increased"))
+                elif not lower_better and v_e < v_b and abs(v_b - v_e) > 0.001:
+                    diff = v_b - v_e
+                    pct_str = f"-{((v_b - v_e) / float(v_b) * 100.0):.1f}%" if v_b > 0 else f"-{diff:.2f}{unit}"
+                    degraded_list.append((label, v_b, v_e, diff, pct_str, unit, "worsened / dropped"))
+
+        print("    " + "-" * 78)
+        if degraded_list:
+            print("    \033[1;31m⚠️  DEGRADED HARDWARE METRICS (Regressed vs Baseline):\033[0m")
+            for label, v_b, v_e, diff, pct_str, unit, action in degraded_list:
+                if "IPC" in label and isinstance(v_b, float):
+                    fmt_b = f"{v_b:.3f}"
+                    fmt_e = f"{v_e:.3f}"
+                else:
+                    fmt_b = f"{v_b:.2f}{unit}" if isinstance(v_b, float) else f"{v_b}{unit}"
+                    fmt_e = f"{v_e:.2f}{unit}" if isinstance(v_e, float) else f"{v_e}{unit}"
+                print(f"      • \033[1;31m{label}\033[0m: Baseline {fmt_b} ➔ Active \033[1;31m{fmt_e}\033[0m ({action}: \033[1;31m{pct_str}\033[0m)")
+        else:
+            print("    \033[1;32m🟢 HARDWARE METRIC HEALTH: Optimal (0.0% regression vs baseline)\033[0m")
+
+        print("    " + "-" * 78)
 
         # Rank Top Performers vs Bottlenecks for this suite
         top_tests = [t for t in suite_res["tests"] if t[5] == "high"]
         stress_tests = [t for t in suite_res["tests"] if t[5] == "low"]
 
-        print("  \033[1;32m🟢 TOP PERFORMERS (Highest Subsystem Efficiency):\033[0m")
-        for idx, (t_name, t_desc, m_label, m_val, m_unit, _) in enumerate(top_tests[:3], 1):
-            print(f"    {idx}. \033[1m{t_name}\033[0m: {m_label} = \033[1;32m{m_val}{m_unit}\033[0m ({t_desc})")
+        print("    \033[1;32m🟢 TOP MICROBENCHMARKS (Highest Subsystem Efficiency):\033[0m")
+        for idx, (t_name, t_desc, m_label, m_val, m_unit, _) in enumerate(top_tests[:2], 1):
+            print(f"      {idx}. \033[1m{t_name}\033[0m: {m_label} = \033[1;32m{m_val}{m_unit}\033[0m ({t_desc})")
 
-        print("  \033[1;31m🔴 CRITICAL BOTTLENECK & STRESS TESTS (Worst Performers / Highest Stalls):\033[0m")
+        print("    \033[1;31m🔴 CRITICAL BOTTLENECK & STRESS TESTS (Worst Performers / Highest Stalls):\033[0m")
         for idx, (t_name, t_desc, m_label, m_val, m_unit, _) in enumerate(stress_tests[:2], 1):
-            print(f"    {idx}. \033[1m{t_name}\033[0m: {m_label} = \033[1;31m{m_val}{m_unit}\033[0m ({t_desc})")
+            print(f"      {idx}. \033[1m{t_name}\033[0m: {m_label} = \033[1;31m{m_val}{m_unit}\033[0m ({t_desc})")
 
     # =========================================================================
     # Global Sensitivity & Cross-Suite Performance Impact Summary

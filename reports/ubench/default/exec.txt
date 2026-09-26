@@ -2,38 +2,48 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       Execution Engine & LSU (exec)
-  Generation Timestamp:  2026-09-26 23:53:27
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/current.cfg
-  Workload Benchmark:    test_store_forward.elf
+  Generation Timestamp:  2026-09-27 00:12:31
+  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Representative ELF:    test_store_forward.elf
   Test Pass Count:       12 / 12
 --------------------------------------------------------------------------------
-  Top Microarchitecture Metrics:
+  Top Microarchitecture Hardware Metrics:
     • cycles: 19
     • ipc: 1.0
+    • insts: 19
+    • uops: 22
     • branch_acc: 100.0
     • branch_mispredicts: 0
     • btb_hit_rate: 0.0
+    • ras_hit_rate: 0.0
     • l1i_hit_rate: 94.74
     • l1d_hit_rate: 75.0
+    • l2_hit_rate: 0.0
     • store_forwards: 3
+    • forwarding_rate: 75.0
     • rs_stalls: 0
     • rob_stalls: 0
+    • prf_stalls: 0
+    • head_rob_stalls: 0
     • retiring: 100.0
+    • bad_spec: 0.0
+    • frontend_bound: 0.0
     • backend_bound: 0.0
+    • l1d_mshr_stalls: 0
 --------------------------------------------------------------------------------
   Detailed Microbenchmark Test Cases:
-  • LSU_UBench_ExactStoreToLoadForwarding          | Forward Rate: 100.0%     | [Optimal] 0-cycle Store Queue to Load Queue memory forwarding
-  • Exec_UBench_RawDependencyChainLatency          | Latency / uop: 1.0 cyc    | [Optimal] Back-to-back RAW physical register dependency
+  • LSU_UBench_ExactStoreToLoadForwarding          | Forward Rate: 100.0%        | [Optimal] 0-cycle Store Queue to Load Queue memory forwarding
+  • Exec_UBench_RawDependencyChainLatency          | Latency / uop: 1.0 cyc     | [Stress/Bottleneck] Back-to-back RAW physical register dependency
   • Exec_UBench_MaxIssueWidthSaturation            | Issue Width: 4.0 uop/cyc | [Optimal] Peak 4-wide superscalar issue port saturation
   • Exec_UBench_MulDivPipelinedLatency             | Throughput: 1.0 uop/cyc | [Optimal] Pipelined 3-cycle MUL and 8-cycle DIV non-blocking execution
-  • Exec_UBench_OutOfOrderConditionEvaluation      | OoO Speedup: 1.50x      | [Optimal] Out-of-order execution with speculative flags
-  • Exec_UBench_AgeOrderedContentionIssue          | Priority Order: Preserved  | [Optimal] Oldest-ready-first priority issue queue arbitration
-  • Exec_UBench_ExecutionPortContention            | Port Efficiency: 98.0%      | [Optimal] Port 0/1/2 structural conflict resolution
-  • LSU_UBench_LoadStoreQueueWrapAround            | Ring Invariant: Verified   | [Optimal] Circular ring buffer LSU pointer wrap stress
-  • LSU_UBench_L1CacheHitVsMissLatency             | L1 Latency: 1 cyc      | [Optimal] 1-cycle L1D hit vs DRAM access latency differential
-  • LSU_UBench_MemoryOrderViolationDetection       | Violation Recovery: Exact      | [Optimal] Younger speculative load address aliasing squashing
-  • LSU_UBench_StoreDataPendingReplay              | Replay Penalty: 2 cyc      | [Stress/Bottleneck] Load replay on uncommitted store data pend
-  • LSU_UBench_StridedAccessCacheThrashing         | Miss Latency: 80 cyc     | [Stress/Bottleneck] Non-contiguous stride access cache miss penalty
+  • Exec_UBench_OutOfOrderConditionEvaluation      | OoO Speedup: 1.5x        | [Optimal] Out-of-order execution with speculative flags
+  • Exec_UBench_AgeOrderedContentionIssue          | Priority Order: 100.0%        | [Optimal] Oldest-ready-first priority issue queue arbitration
+  • Exec_UBench_ExecutionPortContention            | Port Efficiency: 98.0%        | [Optimal] Port 0/1/2 structural conflict resolution
+  • LSU_UBench_LoadStoreQueueWrapAround            | Ring Integrity: 100.0%        | [Optimal] Circular ring buffer LSU pointer wrap stress
+  • LSU_UBench_L1CacheHitVsMissLatency             | L1 Latency: 1.0 cyc     | [Stress/Bottleneck] 1-cycle L1D hit vs DRAM access latency differential
+  • LSU_UBench_MemoryOrderViolationDetection       | Violation Recovery: 100.0%        | [Optimal] Younger speculative load address aliasing squashing
+  • LSU_UBench_StoreDataPendingReplay              | Replay Penalty: 2.0 cyc     | [Stress/Bottleneck] Load replay on uncommitted store data pend
+  • LSU_UBench_StridedAccessCacheThrashing         | Miss Latency: 80.0 cyc     | [Stress/Bottleneck] Non-contiguous stride access cache miss penalty
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
@@ -48,7 +58,7 @@ SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 19
 Elapsed Time:       0.000030 s
-Simulation Speed:   623809.84 inst/s (0.62 MIPS)
+Simulation Speed:   638655.46 inst/s (0.64 MIPS)
 ============================================================
 
 
@@ -65,9 +75,9 @@ Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
   Host Wall-Clock Time:    0.000030 s
-  Simulation Speed:        0.62 M-Ticks/s
-  Simulation MIPS:         0.62 MIPS
-  Simulation Slowdown:     1603.1x
+  Simulation Speed:        0.64 M-Ticks/s
+  Simulation MIPS:         0.64 MIPS
+  Simulation Slowdown:     1565.8x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  19 / 22 (uOp Ratio: 1.16x)
@@ -89,7 +99,7 @@ Active Core Count:         1
     Port MUL uOps:         0
     Port DIV uOps:         0
     Port Branch uOps:      3
-    Port LSU uOps:         18
+    Port LSU uOps:         16
   --- Pipeline Stalls Breakdown ---
     ROB Full Stalls:       0 cycles
     RS/IQ Full Stalls:     0 cycles
