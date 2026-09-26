@@ -61,7 +61,7 @@ TEST(RatPrfTest, RegisterAliasTableSpeculativeCommitAndBranchCheckpoint) {
     EXPECT_EQ(rat.get_commit(0), 0); // Commit RAT untouched
 
     // Take checkpoint before a branch
-    auto checkpoint = rat.create_checkpoint(free_list);
+    auto checkpoint = rat.create_checkpoint();
 
     // Speculatively rename R0 -> P17 after branch
     uint16_t p17 = free_list.allocate();
@@ -69,7 +69,8 @@ TEST(RatPrfTest, RegisterAliasTableSpeculativeCommitAndBranchCheckpoint) {
     EXPECT_EQ(rat.get(0), 17);
 
     // Branch Misprediction: Restore checkpoint!
-    rat.restore_checkpoint(checkpoint, free_list);
+    rat.restore_checkpoint(checkpoint);
+    free_list.free(p17);
     EXPECT_EQ(rat.get(0), 16); // Restored to pre-branch state!
 
     // Commit R0 -> P16

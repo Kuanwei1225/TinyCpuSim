@@ -7,6 +7,8 @@
 #include <iomanip>
 #include "tinyarmsim/common.hpp"
 #include "tinyarmsim/instruction.hpp"
+#include "tinyarmsim/uarch/branch_predictor.hpp"
+#include "tinyarmsim/uarch/rat_prf.hpp"
 
 namespace tinyarmsim::uarch {
 
@@ -48,9 +50,11 @@ struct UOp {
     UOpType type{UOpType::NOP};
     ExecutionPort target_port{ExecutionPort::PORT_0_ALU_BRANCH};
     Opcode opcode{Opcode::NOP};     // Functional ISA opcode
+    ConditionCode cond{ConditionCode::AL}; // Condition code for conditional execution/branches
 
-    // Architectural registers (0..15, 0xFF = invalid/none)
+    // Architectural registers (0..15, 0xFF = invalid/none, 16 = APSR / CPSR flags)
     static constexpr uint8_t INVALID_REG = 0xFF;
+    static constexpr uint8_t ARCH_REG_FLAGS = 16;
     uint8_t arch_src1{INVALID_REG};
     uint8_t arch_src2{INVALID_REG};
     uint8_t arch_src3{INVALID_REG}; // E.g. for MLA / Store data
@@ -62,6 +66,14 @@ struct UOp {
     uint16_t phys_src3{0};
     uint16_t phys_dest{0};
     uint16_t old_phys_dest{0};      // Replaced physical register (for ROB retirement)
+
+    // Flag renaming
+    bool sets_flags{false};
+    uint16_t phys_flags_dest{0};
+    uint16_t old_phys_flags_dest{0};
+    uint16_t phys_flags_src{0};
+    bool flags_src_ready{true};
+    uint32_t flags_val{0};
 
     // Ready flags for issue queue wakeup
     bool src1_ready{true};
@@ -80,6 +92,8 @@ struct UOp {
     bool actual_taken{false};
     uint32_t actual_target{0};
     bool branch_mispredicted{false};
+    BranchPrediction branch_pred{};
+    RegisterAliasTable::Checkpoint rat_checkpoint{};
 
     // Memory subsystem metadata
     uint32_t mem_addr{0};

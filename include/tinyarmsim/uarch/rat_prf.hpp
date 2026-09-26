@@ -70,15 +70,12 @@ private:
 // -----------------------------------------------------------------------------
 class FreeList {
 public:
-    explicit FreeList(size_t num_phys_regs = 128, size_t num_arch_regs = 16)
-        : total_regs_(num_phys_regs) {
+    explicit FreeList(size_t num_phys_regs = 128, size_t num_arch_regs = 17)
+        : total_regs_(num_phys_regs), num_arch_regs_(num_arch_regs), is_free_(num_phys_regs, false) {
         if (num_phys_regs <= num_arch_regs) {
             throw std::invalid_argument("FreeList: num_phys_regs must exceed num_arch_regs");
         }
-        // Initially registers 16..num_phys_regs-1 are free
-        for (size_t i = num_arch_regs; i < num_phys_regs; ++i) {
-            free_regs_.push_back(static_cast<uint16_t>(i));
-        }
+        reset(num_arch_regs);
     }
 
     [[nodiscard]] bool has_free() const noexcept {
@@ -95,17 +92,43 @@ public:
         }
         uint16_t reg = free_regs_.front();
         free_regs_.pop_front();
+        is_free_[reg] = false;
         return reg;
     }
 
     void free(uint16_t phys_reg) noexcept {
-        free_regs_.push_back(phys_reg);
+        if (phys_reg >= total_regs_ || phys_reg < num_arch_regs_) return;
+        if (!is_free_[phys_reg]) {
+            is_free_[phys_reg] = true;
+            free_regs_.push_back(phys_reg);
+        }
     }
 
-    void reset(size_t num_arch_regs = 16) {
+    void reset(size_t num_arch_regs = 17) {
+        num_arch_regs_ = num_arch_regs;
         free_regs_.clear();
-        for (size_t i = num_arch_regs; i < total_regs_; ++i) {
+        std::fill(is_free_.begin(), is_free_.end(), false);
+        for (size_t i = num_arch_regs_; i < total_regs_; ++i) {
+            is_free_[i] = true;
             free_regs_.push_back(static_cast<uint16_t>(i));
+        }
+    }
+
+    template <size_t N>
+    void rebuild_from_committed(const std::array<uint16_t, N>& commit_map) {
+        free_regs_.clear();
+        std::fill(is_free_.begin(), is_free_.end(), false);
+        std::vector<bool> in_use(total_regs_, false);
+        for (size_t i = 0; i < N; ++i) {
+            if (commit_map[i] < total_regs_) {
+                in_use[commit_map[i]] = true;
+            }
+        }
+        for (size_t p = num_arch_regs_; p < total_regs_; ++p) {
+            if (!in_use[p]) {
+                is_free_[p] = true;
+                free_regs_.push_back(static_cast<uint16_t>(p));
+            }
         }
     }
 
@@ -119,7 +142,9 @@ public:
 
 private:
     size_t total_regs_;
+    size_t num_arch_regs_{17};
     std::deque<uint16_t> free_regs_;
+    std::vector<bool> is_free_;
 };
 
 // -----------------------------------------------------------------------------
@@ -127,9 +152,10 @@ private:
 // -----------------------------------------------------------------------------
 class RegisterAliasTable {
 public:
+    static constexpr size_t NUM_ARCH_REGS = 17;
+
     struct Checkpoint {
-        std::array<uint16_t, 16> rat_map;
-        std::deque<uint16_t> free_list_state;
+        std::array<uint16_t, NUM_ARCH_REGS> rat_map;
     };
 
     RegisterAliasTable() {
@@ -137,58 +163,60 @@ public:
     }
 
     [[nodiscard]] uint16_t get(uint8_t arch_reg) const {
-        if (arch_reg >= 16) {
-            throw std::out_of_range("Architectural register index >= 16: " + std::to_string(arch_reg));
+        if (arch_reg >= NUM_ARCH_REGS) {
+            throw std::out_of_range("Architectural register index >= " + std::to_string(NUM_ARCH_REGS) + ": " + std::to_string(arch_reg));
         }
         return spec_map_[arch_reg];
     }
 
     void set(uint8_t arch_reg, uint16_t phys_reg) {
-        if (arch_reg >= 16) {
-            throw std::out_of_range("Architectural register index >= 16: " + std::to_string(arch_reg));
+        if (arch_reg >= NUM_ARCH_REGS) {
+            throw std::out_of_range("Architectural register index >= " + std::to_string(NUM_ARCH_REGS) + ": " + std::to_string(arch_reg));
         }
         spec_map_[arch_reg] = phys_reg;
     }
 
     [[nodiscard]] uint16_t get_commit(uint8_t arch_reg) const {
-        if (arch_reg >= 16) {
-            throw std::out_of_range("Architectural register index >= 16");
+        if (arch_reg >= NUM_ARCH_REGS) {
+            throw std::out_of_range("Architectural register index >= " + std::to_string(NUM_ARCH_REGS));
         }
         return commit_map_[arch_reg];
     }
 
     void commit(uint8_t arch_reg, uint16_t phys_reg) {
-        if (arch_reg >= 16) return;
+        if (arch_reg >= NUM_ARCH_REGS) return;
         commit_map_[arch_reg] = phys_reg;
     }
 
-    [[nodiscard]] Checkpoint create_checkpoint(const FreeList& free_list) const {
+    [[nodiscard]] Checkpoint create_checkpoint() const {
         Checkpoint cp;
         cp.rat_map = spec_map_;
-        cp.free_list_state = free_list.get_state();
         return cp;
     }
 
-    void restore_checkpoint(const Checkpoint& cp, FreeList& free_list) noexcept {
+    void restore_checkpoint(const Checkpoint& cp) noexcept {
         spec_map_ = cp.rat_map;
-        free_list.restore_state(cp.free_list_state);
+    }
+
+    void restore_from_commit() noexcept {
+        spec_map_ = commit_map_;
     }
 
     void rollback_to_commit(FreeList& free_list) noexcept {
         spec_map_ = commit_map_;
-        free_list.reset(16);
+        free_list.rebuild_from_committed(commit_map_);
     }
 
     void reset() {
-        for (uint16_t i = 0; i < 16; ++i) {
+        for (uint16_t i = 0; i < NUM_ARCH_REGS; ++i) {
             spec_map_[i] = i;
             commit_map_[i] = i;
         }
     }
 
 private:
-    std::array<uint16_t, 16> spec_map_{};
-    std::array<uint16_t, 16> commit_map_{};
+    std::array<uint16_t, NUM_ARCH_REGS> spec_map_{};
+    std::array<uint16_t, NUM_ARCH_REGS> commit_map_{};
 };
 
 } // namespace tinyarmsim::uarch

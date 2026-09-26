@@ -23,8 +23,11 @@ Construct the modular cycle-accurate Out-of-Order (OoO) superscalar core simulat
 ### Phase 4: Multi-Core Workloads & Parallel Verification (Completed)
 - [x] **Issue 10**: Multi-Core Execution, Workload Partitioning & Parallel Benchmark Verification (`.scratch/uarch-ooo-engine/issues/10-multicore-workloads.md`)
 
-### Phase 5: Golden Reference & Precision Cross-Validation against gem5 (Ready)
-- [ ] **Issue 11**: Golden Precision Cross-Validation against gem5 (RTL / Reference Target) (`.scratch/uarch-ooo-engine/issues/11-gem5-golden-precision-validation.md`)
+### Phase 5: Golden Reference & Precision Cross-Validation against gem5 (Completed Golden Generation)
+- [x] **Issue 11**: Golden Precision Cross-Validation against gem5 (RTL / Reference Target) (`.scratch/uarch-ooo-engine/issues/11-gem5-golden-precision-validation.md`)
+
+### Phase 6: Top-Down Microarchitecture Profiler & gem5-Compatible Dynamic ROI (Completed)
+- [x] **Issue 12**: Unified Top-Down Profiling Framework & gem5-Compatible Dynamic ROI Tracking (`.scratch/uarch-ooo-engine/issues/12-topdown-profiling-and-dynamic-roi.md`)
 
 ## Key Architecture Decisions
 - **Decoupled Store AGU/Data**: Store instructions are split into `uop_STA` and `uop_STD` so address resolution proceeds independently of data readiness.

@@ -2,18 +2,22 @@
 """
 TinyArmSim vs gem5 Golden Reference Accuracy Comparator
 Parses TinyArmSim performance report and gem5 stats.txt, calculating precision deltas.
+Supports both single file comparison and batch regression against tests/golden/gem5/.
 """
 
 import sys
 import re
 import os
+import glob
+import subprocess
 
-def parse_tinysim_stats(filename):
+def parse_tinysim_stats(filename_or_content):
     stats = {}
-    if not os.path.exists(filename):
-        return stats
-    with open(filename, 'r') as f:
-        content = f.read()
+    if os.path.exists(filename_or_content):
+        with open(filename_or_content, 'r') as f:
+            content = f.read()
+    else:
+        content = filename_or_content
     
     m = re.search(r'Simulated Total Cycles:\s+(\d+)', content)
     if m: stats['cycles'] = int(m.group(1))
@@ -23,6 +27,15 @@ def parse_tinysim_stats(filename):
     
     m = re.search(r'Aggregate Throughput \(IPC\):\s*([\d\.]+)', content)
     if m: stats['ipc'] = float(m.group(1))
+    
+    m = re.search(r'L1I Cache Accesses:\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', content)
+    if m: stats['l1i_hit_rate'] = float(m.group(1))
+
+    m = re.search(r'L1D Cache Accesses:\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', content)
+    if m: stats['l1d_hit_rate'] = float(m.group(1))
+
+    m = re.search(r'Branch Predictions:\s+\d+\s+\(Accuracy:\s*([\d\.]+)%\)', content)
+    if m: stats['branch_acc'] = float(m.group(1))
     
     return stats
 
@@ -37,47 +50,94 @@ def parse_gem5_stats(filename):
             parts = line.split()
             if len(parts) >= 2:
                 key, val = parts[0], parts[1]
-                if key == 'simTicks':
-                    # Assuming 1GHz clock (1000 ticks = 1 cycle)
-                    try: stats['cycles'] = int(val) // 1000
+                if key.endswith('numCycles'):
+                    try: stats['cycles'] = int(val)
                     except: pass
-                elif key == 'simInsts' or key == 'system.cpu.committedInsts':
+                elif key == 'simInsts' or key.endswith('committedInsts'):
                     try: stats['insts'] = int(val)
                     except: pass
-                elif key == 'system.cpu.ipc':
+                elif key.endswith('.ipc') or key == 'ipc':
                     try: stats['ipc'] = float(val)
+                    except: pass
+                elif key.endswith('icache.demandHits::total') or key.endswith('icache.demand_hits::total'):
+                    try: stats['l1i_hits'] = int(val)
+                    except: pass
+                elif key.endswith('icache.demandAccesses::total') or key.endswith('icache.demand_accesses::total'):
+                    try: stats['l1i_accesses'] = int(val)
                     except: pass
     return stats
 
-def main():
-    if len(sys.argv) < 3:
-        print("Usage: compare_with_gem5.py <tinysim_stats.txt> <gem5_stats.txt>")
-        sys.exit(1)
+def print_table(case_name, ts, g5):
+    print("=" * 70)
+    print(f"     Accuracy Delta Report: [{case_name}] vs gem5 Golden")
+    print("=" * 70)
+    print(f"{'Metric':<25} | {'TinyArmSim':<14} | {'gem5 Golden':<14} | {'Delta (%)':<10}")
+    print("-" * 70)
     
-    ts_file = sys.argv[1]
-    g5_file = sys.argv[2]
-    
-    ts = parse_tinysim_stats(ts_file)
-    g5 = parse_gem5_stats(g5_file)
-    
-    print("=" * 65)
-    print("     TinyArmSim vs gem5 Golden Precision Comparison Report     ")
-    print("=" * 65)
-    print(f"{'Metric':<25} | {'TinyArmSim':<12} | {'gem5 Golden':<12} | {'Delta (%)':<10}")
-    print("-" * 65)
-    
-    metrics = ['cycles', 'insts', 'ipc']
-    for m in metrics:
-        v_ts = ts.get(m, 'N/A')
-        v_g5 = g5.get(m, 'N/A')
+    metrics = [
+        ('cycles', 'Simulated Cycles'),
+        ('insts', 'Committed Insts'),
+        ('ipc', 'Throughput (IPC)'),
+    ]
+    for key, label in metrics:
+        v_ts = ts.get(key, 'N/A')
+        v_g5 = g5.get(key, 'N/A')
         delta_str = 'N/A'
         if isinstance(v_ts, (int, float)) and isinstance(v_g5, (int, float)) and v_g5 > 0:
             delta = abs(v_ts - v_g5) / float(v_g5) * 100.0
             delta_str = f"{delta:.2f}%"
         
-        print(f"{m:<25} | {str(v_ts):<12} | {str(v_g5):<12} | {delta_str:<10}")
-    
-    print("=" * 65)
+        print(f"{label:<25} | {str(v_ts):<14} | {str(v_g5):<14} | {delta_str:<10}")
+    print("=" * 70)
+    print()
+
+def main():
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    golden_dir = os.path.join(root_dir, "tests", "golden", "gem5")
+    fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
+    sim_bin = os.path.join(root_dir, "build", "tinyarmsim")
+
+    if len(sys.argv) == 1 or sys.argv[1] in ['--all', '-a']:
+        # Batch regression mode against all golden files
+        golden_files = sorted(glob.glob(os.path.join(golden_dir, "*.stats.txt")))
+        if not golden_files:
+            print(f"No golden reference files found in {golden_dir}")
+            sys.exit(1)
+            
+        print(f"Running automated regression comparison for {len(golden_files)} benchmarks...")
+        print(f"Golden Directory: {golden_dir}\n")
+        
+        for g_file in golden_files:
+            case_name = os.path.basename(g_file).replace('.stats.txt', '')
+            elf_file = os.path.join(fixtures_dir, f"{case_name}.elf")
+            if not os.path.exists(elf_file):
+                print(f"Warning: ELF fixture not found for {case_name}")
+                continue
+                
+            # Run TinyArmSim
+            res = subprocess.run([sim_bin, "--uarch", elf_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            ts = parse_tinysim_stats(res.stdout)
+            g5 = parse_gem5_stats(g_file)
+            print_table(case_name, ts, g5)
+
+    elif len(sys.argv) == 2 and sys.argv[1].startswith('--case='):
+        case_name = sys.argv[1].split('=', 1)[1]
+        g_file = os.path.join(golden_dir, f"{case_name}.stats.txt")
+        elf_file = os.path.join(fixtures_dir, f"{case_name}.elf")
+        res = subprocess.run([sim_bin, "--uarch", elf_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ts = parse_tinysim_stats(res.stdout)
+        g5 = parse_gem5_stats(g_file)
+        print_table(case_name, ts, g5)
+
+    elif len(sys.argv) >= 3:
+        ts = parse_tinysim_stats(sys.argv[1])
+        g5 = parse_gem5_stats(sys.argv[2])
+        print_table(os.path.basename(sys.argv[1]), ts, g5)
+    else:
+        print("Usage:")
+        print("  compare_with_gem5.py --all")
+        print("  compare_with_gem5.py --case=<test_name>")
+        print("  compare_with_gem5.py <tinysim_stats.txt> <gem5_stats.txt>")
 
 if __name__ == '__main__':
     main()

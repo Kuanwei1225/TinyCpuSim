@@ -173,10 +173,29 @@ gtest_discover_tests(lsu_test)
 # uArch OoOCore End-to-End Pipeline Test
 add_executable(ooo_core_test tests/uarch/ooo_core_test.cpp)
 target_link_libraries(ooo_core_test PRIVATE tinyarmsim_core gtest_main)
-gtest_discover_tests(ooo_core_test)
+gtest_discover_tests(ooo_core_test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 # uArch MultiCoreSystem Concurrent Execution Test
 add_executable(multicore_system_test tests/uarch/multicore_system_test.cpp)
 target_link_libraries(multicore_system_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(multicore_system_test)
+
+# uArch Top-Down Profiler Test
+add_executable(topdown_profiler_test tests/topdown_profiler_test.cpp)
+target_link_libraries(topdown_profiler_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(topdown_profiler_test)
+
+# Dynamic ROI and m5ops Test
+add_executable(roi_m5ops_test tests/roi_m5ops_test.cpp)
+target_link_libraries(roi_m5ops_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(roi_m5ops_test)
+
+# uArch BPU and Frontend Isolated Microbenchmarks
+add_executable(bpu_frontend_ubench_test tests/uarch/bpu_frontend_ubench_test.cpp)
+target_link_libraries(bpu_frontend_ubench_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(bpu_frontend_ubench_test)
+
+
 

@@ -36,6 +36,7 @@ public:
             &mem_hierarchy_.get_l1d(core_id),
             pc
         );
+        cores_[core_id]->set_profiler(&profiler_);
     }
 
     // Step entire multi-core system by 1 clock cycle (Lockstep Round-Robin)
@@ -109,9 +110,19 @@ public:
         return stats;
     }
 
+    [[nodiscard]] const TopDownProfiler& get_profiler() const noexcept {
+        return profiler_;
+    }
+
+    [[nodiscard]] TopDownProfiler& get_profiler() noexcept {
+        return profiler_;
+    }
+
 private:
     void init_cores() {
         size_t n = config_.num_cores > 0 ? config_.num_cores : 1;
+        uint32_t issue_w = config_.default_core.issue_width > 0 ? config_.default_core.issue_width : 2;
+        profiler_.init(n, issue_w);
         cores_.reserve(n);
         for (size_t i = 0; i < n; ++i) {
             CoreConfig core_cfg = (i < config_.cores.size()) ? config_.cores[i] : config_.default_core;
@@ -123,10 +134,7 @@ private:
                 &mem_hierarchy_.get_l1d(i),
                 0x10000 // Default entry PC
             );
-            // Secondary cores (1..N-1) wait for activation
-            if (i > 0) {
-                // Secondary core initialized in halted state until explicitly started
-            }
+            core->set_profiler(&profiler_);
             cores_.push_back(std::move(core));
         }
     }
@@ -135,6 +143,7 @@ private:
     MemoryBus mem_bus_;
     CoherentMemoryHierarchy mem_hierarchy_;
     std::vector<std::unique_ptr<OoOCore>> cores_;
+    TopDownProfiler profiler_;
     uint64_t simulated_cycles_{0};
     double wall_time_seconds_{0.0};
 };

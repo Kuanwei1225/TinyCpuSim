@@ -14,6 +14,7 @@
 #include "tinyarmsim/opcode_cache.hpp"
 #include "tinyarmsim/trace.hpp"
 #include "tinyarmsim/faults.hpp"
+#include "tinyarmsim/uarch/topdown_profiler.hpp"
 
 namespace tinyarmsim {
 
@@ -28,6 +29,10 @@ class IsaInterpreter {
 public:
     IsaInterpreter(ArchitecturalState& state, MemoryBus& bus) noexcept
         : state_(state), bus_(bus) {}
+
+    void set_profiler(uarch::TopDownProfiler* profiler) noexcept {
+        profiler_ = profiler;
+    }
 
     void set_logging(bool enable) noexcept {
         logging_enabled_ = enable;
@@ -561,6 +566,18 @@ public:
 
             case Opcode::SVC:
                 log_trace();
+                if (instr.imm == 0x50) { // m5_reset_stats
+                    if (profiler_) profiler_->trigger_m5op(0x50);
+                    break;
+                }
+                if (instr.imm == 0x51) { // m5_dump_stats
+                    if (profiler_) profiler_->trigger_m5op(0x51);
+                    break;
+                }
+                if (instr.imm == 0x52) { // m5_exit
+                    if (profiler_) profiler_->trigger_m5op(0x52);
+                    throw CpuFaultException(FaultType::SoftwareInterrupt, "m5_exit");
+                }
                 throw CpuFaultException(FaultType::SoftwareInterrupt, "SVC interrupt with code " + std::to_string(instr.imm));
 
             default:
@@ -648,6 +665,7 @@ private:
     bool logging_enabled_{false};
     OpcodeCache opcode_cache_{};
     TraceRecord trace_{};
+    uarch::TopDownProfiler* profiler_{nullptr};
 };
 
 } // namespace tinyarmsim

@@ -52,20 +52,25 @@ TEST(UOpDecoderTest, PushInstructionExpandsIntoMultiStoreUops) {
     EXPECT_EQ(dec.op, Opcode::PUSH);
 
     std::vector<UOp> uops = UOpDecoder::decode(dec, 0x1008, 3);
-    // 3 registers * 2 uops (STA + STD) = 6 uops
-    ASSERT_EQ(uops.size(), 6);
+    // 1 SUB SP uop + 3 registers * 2 uops (STA + STD) = 7 uops
+    ASSERT_EQ(uops.size(), 7);
 
-    EXPECT_EQ(uops[0].type, UOpType::STORE_ADDR);
-    EXPECT_EQ(uops[1].type, UOpType::STORE_DATA);
-    EXPECT_EQ(uops[1].arch_src1, 0); // R0
+    EXPECT_EQ(uops[0].type, UOpType::ALU);
+    EXPECT_EQ(uops[0].opcode, Opcode::SUB);
+    EXPECT_EQ(uops[0].arch_dest, 13);
+    EXPECT_EQ(uops[0].imm, 12);
 
-    EXPECT_EQ(uops[2].type, UOpType::STORE_ADDR);
-    EXPECT_EQ(uops[3].type, UOpType::STORE_DATA);
-    EXPECT_EQ(uops[3].arch_src1, 1); // R1
+    EXPECT_EQ(uops[1].type, UOpType::STORE_ADDR);
+    EXPECT_EQ(uops[2].type, UOpType::STORE_DATA);
+    EXPECT_EQ(uops[2].arch_src1, 0); // R0
 
-    EXPECT_EQ(uops[4].type, UOpType::STORE_ADDR);
-    EXPECT_EQ(uops[5].type, UOpType::STORE_DATA);
-    EXPECT_EQ(uops[5].arch_src1, 14); // LR
+    EXPECT_EQ(uops[3].type, UOpType::STORE_ADDR);
+    EXPECT_EQ(uops[4].type, UOpType::STORE_DATA);
+    EXPECT_EQ(uops[4].arch_src1, 1); // R1
+
+    EXPECT_EQ(uops[5].type, UOpType::STORE_ADDR);
+    EXPECT_EQ(uops[6].type, UOpType::STORE_DATA);
+    EXPECT_EQ(uops[6].arch_src1, 14); // LR
 }
 
 TEST(UOpDecoderTest, BranchAndCallInstructionClassification) {

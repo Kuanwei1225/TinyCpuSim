@@ -71,4 +71,6 @@ Testing/
 .antigravity/
 uarch_stats.txt
 cov.csv
+m5out/
+
 

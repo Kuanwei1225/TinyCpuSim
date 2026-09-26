@@ -23,7 +23,7 @@ public:
               Cache* l1i_cache,
               const CoreConfig& core_cfg,
               const BranchPredictorConfig& bp_cfg)
-        : pc_(start_pc),
+        : pc_(start_pc & ~1u),
           bus_(bus),
           l1i_(l1i_cache),
           core_cfg_(core_cfg),
@@ -82,33 +82,44 @@ public:
             // Branch prediction evaluation
             bool redirect = false;
             uint32_t redirect_target = 0;
+            bool is_svc = false;
 
             for (auto& uop : uops) {
+                if (uop.type == UOpType::SVC || uop.type == UOpType::HALT) {
+                    is_svc = true;
+                }
                 if (uop.is_branch) {
                     BranchPrediction pred = branch_pred_.predict(current_inst_pc);
                     uop.pred_taken = pred.taken;
-                    uop.pred_target = pred.target_pc;
+                    uop.pred_target = pred.target_pc & ~1u;
+                    uop.branch_pred = pred;
 
                     // If branch is unconditional (B / BL), default taken if not in BTB
-                    if (uop.opcode == Opcode::B && !pred.is_branch) {
+                    if (uop.opcode == Opcode::B && uop.cond == ConditionCode::AL && !pred.is_branch) {
                         uop.pred_taken = true;
-                        uop.pred_target = static_cast<uint32_t>(static_cast<int32_t>(current_inst_pc + 4) + uop.offset);
+                        uop.pred_target = uop.actual_target & ~1u;
                     } else if (uop.opcode == Opcode::BL && !pred.is_branch) {
                         uop.pred_taken = true;
-                        uop.pred_target = static_cast<uint32_t>(static_cast<int32_t>(current_inst_pc + 4) + uop.offset);
+                        uop.pred_target = uop.actual_target & ~1u;
                     }
 
                     if (uop.pred_taken) {
                         redirect = true;
-                        redirect_target = uop.pred_target;
+                        redirect_target = uop.pred_target & ~1u;
                     }
                 }
                 uop_queue_.push_back(uop);
             }
 
+            // If SVC/HALT, stall front-end from fetching beyond it
+            if (is_svc) {
+                stalled_ = true;
+                break;
+            }
+
             // If a branch is predicted taken, redirect Fetch PC and stop fetching for this cycle
             if (redirect) {
-                pc_ = redirect_target;
+                pc_ = redirect_target & ~1u;
                 break;
             }
         }
@@ -117,7 +128,7 @@ public:
     // Flush front-end on branch misprediction or exception recovery
     void flush(uint32_t target_pc) noexcept {
         uop_queue_.clear();
-        pc_ = target_pc;
+        pc_ = target_pc & ~1u;
         stalled_ = false;
         is_halted_ = false;
     }

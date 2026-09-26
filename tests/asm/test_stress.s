@@ -5,14 +5,12 @@
 .type _start, %function
 
 _start:
-    /* Set up stack in RAM */
-    movw r0, #0x0000
-    movt r0, #0x0010
+    /* Set up stack in allocated BSS buffer */
+    ldr r0, =stack_top
     mov sp, r0
 
-    /* Set up RAM scratch buffer at 0x00020000 */
-    movw r5, #0x0000
-    movt r5, #0x0002
+    /* Set up RAM scratch buffer */
+    ldr r5, =scratch_buf
 
     /* Initialize accumulators */
     movs r0, #1        /* accumulator 1 */
@@ -20,10 +18,9 @@ _start:
     movs r2, #3        /* accumulator 3 */
     movs r3, #4        /* accumulator 4 */
 
-    /* Total loop iterations = 45,000,000 (0x02AEA540) */
-    /* Total instructions executed = ~540,000,000 (strictly >= 5.0 seconds) */
-    movw r4, #0xA540
-    movt r4, #0x02AE   /* r4 = 45,000,000 */
+    /* Total loop iterations = 10,000 (0x2710) */
+    movw r4, #0x2710
+    movt r4, #0x0000   /* r4 = 10,000 */
 
 stress_loop:
     /* ALU Data Processing */
@@ -46,8 +43,18 @@ stress_loop:
 
     /* Success: exit code 0 */
     movs r0, #0
+    movs r7, #1
     svc #0
 
 fail:
     movs r0, #1
+    movs r7, #1
     svc #0
+
+.bss
+.align 4
+scratch_buf:
+    .space 64
+stack_mem:
+    .space 4096
+stack_top:

@@ -36,8 +36,10 @@ _start:
 
     /* Success: exit code 0 */
     movs r0, #0
+    movs r7, #1
     svc #0
 
 fail:
     movs r0, #1
+    movs r7, #1
     svc #0

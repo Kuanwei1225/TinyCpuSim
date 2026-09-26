@@ -43,17 +43,24 @@ private:
 
             if (op5 != 0b11) {
                 instr.rd = rd;
-                instr.rn = rm;
-                instr.is_imm = true;
-                instr.imm = imm5;
                 instr.set_flags = true;
 
-                if (op5 == 0b00) {
-                    instr.op = (imm5 == 0) ? Opcode::MOV : Opcode::LSL;
-                } else if (op5 == 0b01) {
-                    instr.op = Opcode::LSR;
-                } else if (op5 == 0b10) {
-                    instr.op = Opcode::ASR;
+                if (op5 == 0b00 && imm5 == 0) {
+                    instr.op = Opcode::MOV;
+                    instr.rn = rm;
+                    instr.rm = rm;
+                    instr.is_imm = false;
+                } else {
+                    instr.rn = rm;
+                    instr.is_imm = true;
+                    instr.imm = imm5;
+                    if (op5 == 0b00) {
+                        instr.op = Opcode::LSL;
+                    } else if (op5 == 0b01) {
+                        instr.op = Opcode::LSR;
+                    } else if (op5 == 0b10) {
+                        instr.op = Opcode::ASR;
+                    }
                 }
                 return instr;
             }
@@ -385,9 +392,61 @@ private:
 
             uint32_t imm16 = (imm4 << 12) | (i << 11) | (imm3 << 8) | imm8;
             instr.rd = static_cast<uint8_t>(rd);
+            instr.rn = static_cast<uint8_t>(rd);
             instr.is_imm = true;
             instr.imm = imm16;
             return instr;
+        }
+
+        // 2. 32-bit Data Processing (Modified Immediate): [15:11] == 11110, bit 9 == 0
+        if ((w1 & 0xFBE0) == 0xF000 && (w2 & 0x8000) == 0) {
+            uint8_t op4 = static_cast<uint8_t>((w1 >> 5) & 0xF);
+            bool set_flags = ((w1 >> 4) & 0x1) != 0;
+            uint8_t rn = static_cast<uint8_t>(w1 & 0xF);
+            uint32_t i = (w1 >> 10) & 0x1;
+            uint32_t imm3 = (w2 >> 12) & 0x7;
+            uint8_t rd = static_cast<uint8_t>((w2 >> 8) & 0xF);
+            uint32_t imm8 = w2 & 0xFF;
+            uint32_t imm12 = (i << 11) | (imm3 << 8) | imm8;
+
+            uint32_t imm_val = 0;
+            uint32_t type = (imm12 >> 8) & 0xF;
+            uint32_t val8 = imm12 & 0xFF;
+            if ((type >> 2) == 0) {
+                switch (type & 0x3) {
+                    case 0b00: imm_val = val8; break;
+                    case 0b01: imm_val = (val8 << 16) | val8; break;
+                    case 0b10: imm_val = (val8 << 24) | (val8 << 8); break;
+                    case 0b11: imm_val = (val8 << 24) | (val8 << 16) | (val8 << 8) | val8; break;
+                }
+            } else {
+                uint32_t unrotated = (1u << 7) | (imm12 & 0x7F);
+                uint32_t rot = (imm12 >> 7) & 0x1F;
+                imm_val = (unrotated >> rot) | (unrotated << (32 - rot));
+            }
+
+            instr.rd = rd;
+            instr.rn = rn;
+            instr.is_imm = true;
+            instr.imm = imm_val;
+            instr.set_flags = set_flags;
+
+            switch (op4) {
+                case 0b0000: instr.op = (rd == 0xF) ? Opcode::TST : Opcode::AND; break;
+                case 0b0001: instr.op = Opcode::BIC; break;
+                case 0b0010: instr.op = (rn == 0xF) ? Opcode::MOV : Opcode::ORR; break;
+                case 0b0011: instr.op = (rn == 0xF) ? Opcode::MVN : Opcode::ORR; break;
+                case 0b0100: instr.op = (rd == 0xF) ? Opcode::TEQ : Opcode::EOR; break;
+                case 0b1000: instr.op = (rd == 0xF) ? Opcode::CMN : Opcode::ADD; break;
+                case 0b1010: instr.op = Opcode::ADC; break;
+                case 0b1011: instr.op = Opcode::SBC; break;
+                case 0b1101: instr.op = (rd == 0xF) ? Opcode::CMP : Opcode::SUB; break;
+                case 0b1110: instr.op = Opcode::RSB; break;
+                default: instr.op = Opcode::UNKNOWN; break;
+            }
+            if (instr.op != Opcode::UNKNOWN) {
+                return instr;
+            }
         }
 
         // 2. 32-bit Data Processing (modified register / shifted): [15:9] == 1110101 (0xEA00/0xEB00)

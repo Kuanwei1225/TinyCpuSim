@@ -13,3 +13,9 @@ Canonical 5-role triage label vocabulary (`needs-triage`, `needs-info`, `ready-f
 ### Domain docs
 
 Single-context repo layout (`CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
+
+### Engineering Skills
+
+Engineering skills and practices live in `.agents/skills/skills/engineering/` (including `tdd`, `implement`, `codebase-design`, `code-review`, `wayfinder`, `domain-modeling`).
+Always follow TDD vertical slicing, deep module design, and agreed seams when implementing features.
+

@@ -5,9 +5,8 @@
 .type _start, %function
 
 _start:
-    /* Set up stack pointer in RAM */
-    movw r0, #0x0000
-    movt r0, #0x0010
+    /* Set up stack pointer in allocated BSS buffer */
+    ldr r0, =stack_top
     mov sp, r0
 
     /* Compute Fibonacci(10) */
@@ -20,10 +19,12 @@ _start:
 
     /* Success: exit code 0 */
     movs r0, #0
+    movs r7, #1
     svc #0
 
 fail:
     movs r0, #1
+    movs r7, #1
     svc #0
 
 /* int fib(int n) */
@@ -53,3 +54,10 @@ fib_zero:
 fib_one:
     movs r0, #1
     pop {r4, r5, pc}
+
+.bss
+.align 4
+stack_mem:
+    .space 4096
+stack_top:
+

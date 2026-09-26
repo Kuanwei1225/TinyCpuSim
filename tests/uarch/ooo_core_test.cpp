@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
+#include <fstream>
 #include "tinyarmsim/memory_bus.hpp"
+#include "tinyarmsim/loader.hpp"
 #include "tinyarmsim/uarch/ooo_core.hpp"
 
 using namespace tinyarmsim;
@@ -58,3 +60,149 @@ TEST(OoOCoreTest, RawDataHazardWakeupThroughPhysicalRegisters) {
     EXPECT_TRUE(core.is_halted());
     EXPECT_GE(core.get_committed_instructions(), 2);
 }
+
+TEST(OoOCoreTest, RunsTestArithmeticElfToCleanHalt) {
+    MemoryBus bus(64 * 1024 * 1024);
+    ArchitecturalState state;
+    std::ifstream file("tests/fixtures/test_arithmetic.elf", std::ios::binary);
+    if (!file.is_open()) {
+        file.open("../tests/fixtures/test_arithmetic.elf", std::ios::binary);
+    }
+    ASSERT_TRUE(file.is_open());
+    Loader::load_elf(file, bus, state);
+
+    CoreConfig cfg;
+    cfg.fetch_width = 2;
+    cfg.commit_width = 2;
+    cfg.issue_width = 2;
+    cfg.rob_size = 32;
+    cfg.rs_size = 16;
+    OoOCore core(0, cfg, bus, nullptr, nullptr, state.get_pc());
+
+    for (int cycle = 0; cycle < 1000; ++cycle) {
+        core.tick();
+        if (core.is_halted()) break;
+    }
+
+    std::cout << "DEBUG: TestArithmetic halted=" << core.is_halted() 
+              << " committed=" << core.get_committed_instructions()
+              << " cycles=" << core.get_cycles() << std::endl;
+
+    EXPECT_TRUE(core.is_halted());
+    EXPECT_LE(core.get_committed_instructions(), 30);
+}
+
+TEST(OoOCoreTest, RunsTestFibonacciElfToCleanHalt) {
+    MemoryBus bus(64 * 1024 * 1024);
+    ArchitecturalState state;
+    std::ifstream file("tests/fixtures/test_fibonacci.elf", std::ios::binary);
+    if (!file.is_open()) {
+        file.open("../tests/fixtures/test_fibonacci.elf", std::ios::binary);
+    }
+    ASSERT_TRUE(file.is_open());
+    Loader::load_elf(file, bus, state);
+
+    CoreConfig cfg;
+    cfg.fetch_width = 4;
+    cfg.commit_width = 4;
+    cfg.issue_width = 4;
+    cfg.rob_size = 64;
+    cfg.rs_size = 32;
+    OoOCore core(0, cfg, bus, nullptr, nullptr, state.get_pc());
+
+    for (int cycle = 0; cycle < 10000; ++cycle) {
+        try {
+            core.tick();
+        } catch (const std::exception& e) {
+            std::cout << "DEBUG: Exception at cycle " << cycle << ": " << e.what() << std::endl;
+            break;
+        }
+        if (core.is_halted()) break;
+    }
+
+    std::cout << "DEBUG: TestFibonacci halted=" << core.is_halted() 
+              << " committed=" << core.get_committed_instructions()
+              << " cycles=" << core.get_cycles() << std::endl;
+
+    EXPECT_TRUE(core.is_halted());
+    EXPECT_GT(core.get_committed_instructions(), 1000);
+}
+
+TEST(OoOCoreTest, RunsTestStoreForwardElfToCleanHalt) {
+    MemoryBus bus(64 * 1024 * 1024);
+    ArchitecturalState state;
+    std::ifstream file("tests/fixtures/test_store_forward.elf", std::ios::binary);
+    if (!file.is_open()) {
+        file.open("../tests/fixtures/test_store_forward.elf", std::ios::binary);
+    }
+    ASSERT_TRUE(file.is_open());
+    Loader::load_elf(file, bus, state);
+
+    CoreConfig cfg;
+    OoOCore core(0, cfg, bus, nullptr, nullptr, state.get_pc());
+
+    for (int cycle = 0; cycle < 50; ++cycle) {
+        core.tick();
+        if (core.is_halted()) break;
+    }
+
+    std::cout << "DEBUG: TestStoreForward halted=" << core.is_halted() 
+              << " committed=" << core.get_committed_instructions()
+              << " cycles=" << core.get_cycles() << std::endl;
+
+    EXPECT_TRUE(core.is_halted());
+    EXPECT_GT(core.get_committed_instructions(), 10);
+}
+
+TEST(OoOCoreTest, RunsTestStressElfToCleanHalt) {
+    MemoryBus bus(64 * 1024 * 1024);
+    ArchitecturalState state;
+    std::ifstream file("tests/fixtures/test_stress.elf", std::ios::binary);
+    if (!file.is_open()) {
+        file.open("../tests/fixtures/test_stress.elf", std::ios::binary);
+    }
+    ASSERT_TRUE(file.is_open());
+    Loader::load_elf(file, bus, state);
+
+    CoreConfig cfg;
+    OoOCore core(0, cfg, bus, nullptr, nullptr, state.get_pc());
+
+    for (int cycle = 0; cycle < 200000; ++cycle) {
+        core.tick();
+        if (core.is_halted()) break;
+    }
+
+    std::cout << "DEBUG: TestStress halted=" << core.is_halted() 
+              << " committed=" << core.get_committed_instructions()
+              << " cycles=" << core.get_cycles() << std::endl;
+
+    EXPECT_TRUE(core.is_halted());
+    EXPECT_GT(core.get_committed_instructions(), 100000);
+}
+
+TEST(OoOCoreTest, RunsTestIsaCoverageElfToCleanHalt) {
+    MemoryBus bus(64 * 1024 * 1024);
+    ArchitecturalState state;
+    std::ifstream file("tests/fixtures/test_isa_coverage.elf", std::ios::binary);
+    if (!file.is_open()) {
+        file.open("../tests/fixtures/test_isa_coverage.elf", std::ios::binary);
+    }
+    ASSERT_TRUE(file.is_open());
+    Loader::load_elf(file, bus, state);
+
+    CoreConfig cfg;
+    OoOCore core(0, cfg, bus, nullptr, nullptr, state.get_pc());
+
+    for (int cycle = 0; cycle < 300; ++cycle) {
+        core.tick();
+        if (core.is_halted()) break;
+    }
+
+    std::cout << "DEBUG: TestIsaCoverage halted=" << core.is_halted() 
+              << " committed=" << core.get_committed_instructions()
+              << " cycles=" << core.get_cycles() << std::endl;
+
+    EXPECT_TRUE(core.is_halted());
+    EXPECT_GT(core.get_committed_instructions(), 100);
+}
+

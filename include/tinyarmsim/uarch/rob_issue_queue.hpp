@@ -51,6 +51,20 @@ public:
         return capacity_;
     }
 
+    [[nodiscard]] size_t get_head() const noexcept {
+        return head_;
+    }
+
+    [[nodiscard]] size_t get_tail() const noexcept {
+        return tail_;
+    }
+
+    [[nodiscard]] bool is_younger(size_t a_idx, size_t b_idx) const noexcept {
+        size_t dist_a = (a_idx + capacity_ - head_) % capacity_;
+        size_t dist_b = (b_idx + capacity_ - head_) % capacity_;
+        return dist_a > dist_b;
+    }
+
     size_t allocate(const UOp& uop) {
         if (is_full()) {
             throw std::runtime_error("ROB is full cannot allocate");
@@ -104,16 +118,24 @@ public:
     }
 
     // Flush all entries younger than the given rob_idx (exclusive)
-    void flush_younger_than(size_t rob_idx) noexcept {
+    template <typename Func>
+    void flush_younger_than(size_t rob_idx, Func&& on_flush_uop) noexcept {
         if (is_empty()) return;
         size_t curr = (rob_idx + 1) % capacity_;
         while (curr != tail_) {
+            if (entries_[curr].valid) {
+                on_flush_uop(entries_[curr].uop);
+            }
             entries_[curr].valid = false;
             entries_[curr].ready = false;
             curr = (curr + 1) % capacity_;
             if (count_ > 0) count_--;
         }
         tail_ = (rob_idx + 1) % capacity_;
+    }
+
+    void flush_younger_than(size_t rob_idx) noexcept {
+        flush_younger_than(rob_idx, [](const UOp&) {});
     }
 
     void reset() noexcept {
@@ -183,6 +205,20 @@ public:
         throw std::runtime_error("IssueQueue inconsistent state");
     }
 
+    void replay_insert(const UOp& uop) {
+        for (auto& entry : entries_) {
+            if (!entry.valid) {
+                entry.uop = uop;
+                entry.valid = true;
+                count_++;
+                return;
+            }
+        }
+        entries_.push_back({uop, true});
+        count_++;
+        capacity_ = entries_.size();
+    }
+
     // Broadcast tag writeback from execution units
     void wakeup(uint16_t completed_phys_reg) noexcept {
         for (auto& entry : entries_) {
@@ -191,23 +227,32 @@ public:
                 if (uop.phys_src1 == completed_phys_reg) uop.src1_ready = true;
                 if (uop.phys_src2 == completed_phys_reg) uop.src2_ready = true;
                 if (uop.phys_src3 == completed_phys_reg) uop.src3_ready = true;
+                if (uop.phys_flags_src == completed_phys_reg) uop.flags_src_ready = true;
             }
         }
     }
 
-    // Select up to max_issue ready uOps
+    // Select up to max_issue ready uOps (oldest-first priority)
     [[nodiscard]] std::vector<UOp> select_and_issue(uint32_t max_issue) {
-        std::vector<UOp> issued;
-        for (auto& entry : entries_) {
-            if (entry.valid) {
-                const auto& uop = entry.uop;
-                if (uop.src1_ready && uop.src2_ready && uop.src3_ready) {
-                    issued.push_back(uop);
-                    entry.valid = false;
-                    count_--;
-                    if (issued.size() >= max_issue) break;
+        std::vector<size_t> ready_indices;
+        for (size_t i = 0; i < entries_.size(); ++i) {
+            if (entries_[i].valid) {
+                const auto& uop = entries_[i].uop;
+                if (uop.src1_ready && uop.src2_ready && uop.src3_ready && uop.flags_src_ready) {
+                    ready_indices.push_back(i);
                 }
             }
+        }
+        std::sort(ready_indices.begin(), ready_indices.end(), [this](size_t a, size_t b) {
+            return entries_[a].uop.seq_num < entries_[b].uop.seq_num;
+        });
+
+        std::vector<UOp> issued;
+        for (size_t idx : ready_indices) {
+            issued.push_back(entries_[idx].uop);
+            entries_[idx].valid = false;
+            count_--;
+            if (issued.size() >= max_issue) break;
         }
         return issued;
     }
@@ -216,6 +261,16 @@ public:
     void flush_squashed() noexcept {
         for (auto& entry : entries_) {
             if (entry.valid && entry.uop.is_squashed) {
+                entry.valid = false;
+                if (count_ > 0) count_--;
+            }
+        }
+    }
+
+    // Selective flush for younger instructions on branch misprediction
+    void flush_younger_than(uint64_t seq_num) noexcept {
+        for (auto& entry : entries_) {
+            if (entry.valid && entry.uop.seq_num > seq_num) {
                 entry.valid = false;
                 if (count_ > 0) count_--;
             }

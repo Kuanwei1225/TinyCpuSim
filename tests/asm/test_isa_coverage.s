@@ -5,14 +5,12 @@
 .type _start, %function
 
 _start:
-    /* Set up stack pointer in RAM */
-    movw r0, #0x0000
-    movt r0, #0x0010
+    /* Set up stack pointer in allocated BSS buffer */
+    ldr r0, =stack_top
     mov sp, r0
 
-    /* Set up scratch buffer address in RAM (0x00020000) */
-    movw r4, #0x0000
-    movt r4, #0x0002
+    /* Set up scratch buffer address */
+    ldr r4, =scratch_buf
 
     /* Initialize loop counter: 3 iterations */
     movs r7, #3
@@ -84,6 +82,7 @@ test_cbnz_target:
 
     /* 8. Memory Single: STR, LDR, STRB, LDRB, STRH, LDRH, LDRSB, LDRSH */
     /* Store and load word */
+    ldr r4, =scratch_buf
     movs r1, #0x42
     str r1, [r4, #0]
     ldr r2, [r4, #0]
@@ -113,12 +112,10 @@ test_cbnz_target:
     /* 9. Memory Multiple: STM, LDM */
     movs r1, #11
     movs r2, #22
-    movw r4, #0x0000
-    movt r4, #0x0002
+    ldr r4, =scratch_buf
     stm r4!, {r1, r2}
     
-    movw r4, #0x0000
-    movt r4, #0x0002
+    ldr r4, =scratch_buf
     ldm r4!, {r1, r2}
     cmp r1, #11
     bne fail
@@ -147,10 +144,12 @@ test_cbnz_target:
 
     /* All 3 iterations finished successfully */
     movs r0, #0
+    movs r7, #1
     svc #0
 
 fail:
     movs r0, #1
+    movs r7, #1
     svc #0
 
 /* Functions for BL / BLX / BX testing */
@@ -161,3 +160,11 @@ test_bl_target:
 .type test_blx_target, %function
 test_blx_target:
     bx lr
+
+.bss
+.align 4
+scratch_buf:
+    .space 128
+stack_mem:
+    .space 4096
+stack_top:

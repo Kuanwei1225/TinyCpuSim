@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <algorithm>
+#include "tinyarmsim/memory_bus.hpp"
 #include "tinyarmsim/uarch/uop.hpp"
 #include "tinyarmsim/uarch/config.hpp"
 #include "tinyarmsim/uarch/stats.hpp"
@@ -40,9 +41,10 @@ struct StoreQueueEntry {
 
 class LoadStoreUnit {
 public:
-    LoadStoreUnit(const LsuConfig& cfg, Cache* l1d_cache)
+    LoadStoreUnit(const LsuConfig& cfg, Cache* l1d_cache, MemoryBus* bus = nullptr)
         : config_(cfg),
           l1d_(l1d_cache),
+          bus_(bus),
           lq_(cfg.lq_size > 0 ? cfg.lq_size : 16),
           sq_(cfg.sq_size > 0 ? cfg.sq_size : 16),
           lq_capacity_(cfg.lq_size > 0 ? cfg.lq_size : 16),
@@ -92,23 +94,38 @@ public:
         throw std::runtime_error("StoreQueue allocation failed");
     }
 
+    void set_rob_idx_load(size_t lq_idx, size_t rob_idx) noexcept {
+        if (lq_idx < lq_capacity_) {
+            lq_[lq_idx].uop.rob_idx = rob_idx;
+        }
+    }
+
+    void set_rob_idx_store(size_t sq_idx, size_t rob_idx) noexcept {
+        if (sq_idx < sq_capacity_) {
+            sq_[sq_idx].rob_idx = rob_idx;
+        }
+    }
+
     // Execute Store Address uop (STA) -> Port 3
     // Returns true if a speculative load memory hazard violation is detected
     bool execute_store_address(size_t sq_idx, uint32_t addr, uint8_t size_bytes, uint64_t store_seq_num, size_t& out_violating_rob_idx) {
         if (sq_idx >= sq_capacity_ || !sq_[sq_idx].valid) {
-            throw std::out_of_range("Invalid SQ index for STA");
+            std::string reason = (sq_idx >= sq_capacity_) ? "Out of bounds" : ("sq entry invalid (seq_num in sq=" + std::to_string(sq_[sq_idx].seq_num) + ", uop seq_num=" + std::to_string(store_seq_num) + ")");
+            throw std::out_of_range("Invalid SQ index " + std::to_string(sq_idx) + " for STA: " + reason);
         }
         sq_[sq_idx].addr = addr;
         sq_[sq_idx].size_bytes = size_bytes;
         sq_[sq_idx].addr_valid = true;
 
         // Memory Order Buffer (MOB) Disambiguation:
-        // Check if any younger speculative load already executed and read from the same line/address
+        // Check if any younger speculative load already executed and read from an overlapping address range
+        uint32_t s_end = addr + size_bytes;
         for (const auto& lq_entry : lq_) {
             if (lq_entry.valid && lq_entry.addr_valid && lq_entry.data_ready) {
                 if (lq_entry.uop.seq_num > store_seq_num) {
-                    // Overlapping address check
-                    if (lq_entry.addr == addr || (lq_entry.addr >> 2) == (addr >> 2)) {
+                    uint32_t l_end = lq_entry.addr + lq_entry.size_bytes;
+                    bool overlap = (addr < l_end) && (lq_entry.addr < s_end);
+                    if (overlap) {
                         if (!lq_entry.forwarded_from_sq) {
                             out_violating_rob_idx = lq_entry.uop.rob_idx;
                             stats_.memory_order_violations++;
@@ -138,14 +155,13 @@ public:
         uint32_t latency_cycles{1};
     };
 
-    LoadResult execute_load(size_t lq_idx, uint32_t addr, uint8_t size_bytes, uint64_t load_seq_num) {
+    LoadResult execute_load(size_t lq_idx, uint32_t addr, uint8_t size_bytes, uint64_t load_seq_num, bool is_signed = false) {
         if (lq_idx >= lq_capacity_ || !lq_[lq_idx].valid) {
             throw std::out_of_range("Invalid LQ index for load");
         }
         lq_[lq_idx].addr = addr;
         lq_[lq_idx].size_bytes = size_bytes;
         lq_[lq_idx].addr_valid = true;
-        stats_.loads++;
 
         LoadResult res;
 
@@ -166,21 +182,44 @@ public:
                 }
             }
 
-            if (best_match != -1 && sq_[static_cast<size_t>(best_match)].data_valid) {
-                res.completed = true;
-                res.forwarded = true;
-                res.data = sq_[static_cast<size_t>(best_match)].data;
-                res.latency_cycles = config_.store_forward_latency > 0 ? config_.store_forward_latency : 1;
+            if (best_match != -1) {
+                if (sq_[static_cast<size_t>(best_match)].data_valid) {
+                    res.completed = true;
+                    res.forwarded = true;
+                    res.data = sq_[static_cast<size_t>(best_match)].data;
+                    res.latency_cycles = config_.store_forward_latency > 0 ? config_.store_forward_latency : 1;
 
-                lq_[lq_idx].data = res.data;
-                lq_[lq_idx].data_ready = true;
-                lq_[lq_idx].forwarded_from_sq = true;
-                stats_.forwarded_loads++;
-                return res;
+                    lq_[lq_idx].data = res.data;
+                    lq_[lq_idx].data_ready = true;
+                    lq_[lq_idx].forwarded_from_sq = true;
+                    stats_.forwarded_loads++;
+                    stats_.loads++;
+                    return res;
+                } else {
+                    // Match found in SQ but store data is pending - replay load
+                    res.completed = false;
+                    return res;
+                }
             }
         }
 
-        // 2. L1 Data Cache Access
+        stats_.loads++;
+
+        // 2. L1 Data Cache Access & Memory Bus Read
+        uint32_t bus_data = 0;
+        if (bus_) {
+            if (size_bytes == 1) {
+                uint8_t b_val = bus_->read8(addr);
+                bus_data = is_signed ? static_cast<uint32_t>(static_cast<int8_t>(b_val)) : b_val;
+            } else if (size_bytes == 2) {
+                uint16_t h_val = bus_->read16(addr);
+                bus_data = is_signed ? static_cast<uint32_t>(static_cast<int16_t>(h_val)) : h_val;
+            } else {
+                bus_data = bus_->read32(addr);
+            }
+        }
+        res.data = bus_data;
+
         if (l1d_ && l1d_->get_config().enabled) {
             uint32_t lat = 1;
             auto cache_res = l1d_->access(addr, false, lat);
@@ -191,6 +230,7 @@ public:
             res.latency_cycles = 1;
         }
 
+        lq_[lq_idx].data = res.data;
         lq_[lq_idx].data_ready = true;
         return res;
     }
@@ -199,6 +239,15 @@ public:
     void commit_store(size_t sq_idx) {
         if (sq_idx >= sq_capacity_ || !sq_[sq_idx].valid) return;
         const auto& sq = sq_[sq_idx];
+        if (bus_) {
+            if (sq.size_bytes == 1) {
+                bus_->write8(sq.addr, static_cast<uint8_t>(sq.data & 0xFF));
+            } else if (sq.size_bytes == 2) {
+                bus_->write16(sq.addr, static_cast<uint16_t>(sq.data & 0xFFFF));
+            } else {
+                bus_->write32(sq.addr, sq.data);
+            }
+        }
         if (l1d_ && l1d_->get_config().enabled) {
             uint32_t lat = 1;
             l1d_->access(sq.addr, true, lat);
@@ -242,6 +291,7 @@ public:
 private:
     LsuConfig config_;
     Cache* l1d_{nullptr};
+    MemoryBus* bus_{nullptr};
     std::vector<LoadQueueEntry> lq_;
     std::vector<StoreQueueEntry> sq_;
     size_t lq_capacity_;

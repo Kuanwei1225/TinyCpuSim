@@ -27,12 +27,15 @@ void print_usage(const char* prog_name) {
               << "Microarchitecture (uArch / OoO) Options:\n"
               << "  --uarch                  Enable microarchitectural simulation mode\n"
               << "  -u, --uarch-config <file> Load uArch configuration file (default: OoO medium)\n"
-              << "  --uarch-stats <file>     Export hardware performance counters to report file\n\n"
+              << "  --uarch-stats <file>     Export hardware performance counters to report file\n"
+              << "  --topdown [file]         Enable Top-Down microarchitectural profiler (default: stdout)\n"
+              << "  --topdown-format <fmt>   Set Top-Down export format (text, json, csv; default: text)\n\n"
               << "Examples:\n"
               << "  " << prog_name << " app.elf\n"
               << "  " << prog_name << " --log --coverage cov.csv app.elf\n"
               << "  " << prog_name << " --uarch --uarch-config configs/ooo_medium.cfg app.elf\n"
               << "  " << prog_name << " --uarch --uarch-stats stats.txt app.elf\n"
+              << "  " << prog_name << " --uarch --topdown report.json --topdown-format json app.elf\n"
               << std::endl;
 }
 
@@ -64,8 +67,11 @@ int main(int argc, char* argv[]) {
     std::string coverage_path;
     std::string uarch_config_path;
     std::string uarch_stats_path;
+    std::string topdown_path;
+    std::string topdown_format = "text";
     bool enable_log = false;
     bool enable_uarch = false;
+    bool enable_topdown = false;
     uint64_t max_steps = 1000000000;
 
     for (int i = 1; i < argc; ++i) {
@@ -77,6 +83,28 @@ int main(int argc, char* argv[]) {
             enable_log = true;
         } else if (arg == "--uarch" || arg == "--uarch-mode") {
             enable_uarch = true;
+        } else if (arg == "--topdown") {
+            enable_uarch = true;
+            enable_topdown = true;
+        } else if (arg.rfind("--topdown=", 0) == 0) {
+            enable_uarch = true;
+            enable_topdown = true;
+            topdown_path = arg.substr(10);
+        } else if (arg == "--topdown-file" || arg == "--topdown-report") {
+            enable_uarch = true;
+            enable_topdown = true;
+            if (i + 1 < argc) {
+                topdown_path = argv[++i];
+            } else {
+                std::cerr << "Error: --topdown-file requires a file path argument.\n";
+                return 1;
+            }
+        } else if (arg == "--topdown-format") {
+            if (i + 1 < argc) {
+                topdown_format = argv[++i];
+            }
+        } else if (arg.rfind("--topdown-format=", 0) == 0) {
+            topdown_format = arg.substr(17);
         } else if (arg == "-u" || arg == "--uarch-config") {
             enable_uarch = true;
             if (i + 1 < argc) {
@@ -211,7 +239,7 @@ int main(int argc, char* argv[]) {
 
         tinyarmsim::uarch::UArchStats ustats = uarch_sys.collect_stats();
         if (ustats.total_committed_instructions() == 0) {
-            ustats.total_simulated_cycles = stats.instruction_count > 0 ? static_cast<uint64_t>(stats.instruction_count * 1.2) : 0;
+            ustats.total_simulated_cycles = stats.instruction_count > 0 ? static_cast<uint64_t>(static_cast<double>(stats.instruction_count) * 1.2) : 0;
             tinyarmsim::uarch::CoreStats core0;
             core0.committed_instructions = stats.instruction_count;
             core0.cycles = ustats.total_simulated_cycles;
@@ -229,6 +257,22 @@ int main(int argc, char* argv[]) {
                 std::cout << "uArch performance counters written to: " << uarch_stats_path << "\n";
             } else {
                 std::cerr << "Warning: Could not write uArch stats report to: " << uarch_stats_path << "\n";
+            }
+        }
+
+        if (enable_topdown) {
+            const auto& profiler = uarch_sys.get_profiler();
+            tinyarmsim::uarch::ExportFormat fmt = tinyarmsim::uarch::ExportFormat::Text;
+            if (topdown_format == "json") fmt = tinyarmsim::uarch::ExportFormat::JSON;
+            else if (topdown_format == "csv") fmt = tinyarmsim::uarch::ExportFormat::CSV;
+
+            if (!topdown_path.empty()) {
+                profiler.export_report(topdown_path, fmt);
+                std::cout << "Top-Down microarchitectural profile written to: " << topdown_path << "\n";
+            } else {
+                if (fmt == tinyarmsim::uarch::ExportFormat::JSON) std::cout << "\n" << profiler.format_json() << "\n";
+                else if (fmt == tinyarmsim::uarch::ExportFormat::CSV) std::cout << "\n" << profiler.format_csv() << "\n";
+                else std::cout << "\n" << profiler.format_text() << "\n";
             }
         }
     }

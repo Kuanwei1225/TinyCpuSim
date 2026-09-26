@@ -6,13 +6,11 @@
 
 _start:
     /* Set up stack */
-    movw r0, #0x0000
-    movt r0, #0x0010
+    ldr r0, =stack_top
     mov sp, r0
 
     /* Initialize array of 4 words in memory: [40, 10, 30, 20] */
-    movw r4, #0x2000
-    movt r4, #0x0000   /* r4 = base address 0x00002000 */
+    ldr r4, =arr
 
     movs r0, #40
     str r0, [r4, #0]
@@ -78,8 +76,18 @@ check_sorted:
 
     /* Success: exit code 0 */
     movs r0, #0
+    movs r7, #1
     svc #0
 
 fail:
     movs r0, #1
+    movs r7, #1
     svc #0
+
+.bss
+.align 4
+arr:
+    .space 64
+stack_mem:
+    .space 4096
+stack_top:
