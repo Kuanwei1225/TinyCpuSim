@@ -11,6 +11,7 @@
 #include "tinyarmsim/uarch/config.hpp"
 #include "tinyarmsim/uarch/stats.hpp"
 #include "tinyarmsim/uarch/memory_hierarchy.hpp"
+#include "tinyarmsim/uarch/multicore_system.hpp"
 
 namespace {
 
@@ -196,13 +197,27 @@ int main(int argc, char* argv[]) {
     print_banner(passed, exit_code, fault_msg, stats);
 
     if (enable_uarch) {
-        tinyarmsim::uarch::UArchStats ustats;
+        tinyarmsim::uarch::MultiCoreSystem uarch_sys(uarch_cfg, 64 * 1024 * 1024);
+        // Load ELF into uArch bus
+        std::ifstream uarch_elf_file(elf_path, std::ios::binary);
+        if (uarch_elf_file.is_open()) {
+            tinyarmsim::ArchitecturalState ustate;
+            try {
+                tinyarmsim::Loader::load_elf(uarch_elf_file, uarch_sys.get_bus(), ustate);
+                uarch_sys.set_entry_pc(0, ustate.get_pc());
+                uarch_sys.run(max_steps);
+            } catch (...) {}
+        }
+
+        tinyarmsim::uarch::UArchStats ustats = uarch_sys.collect_stats();
+        if (ustats.total_committed_instructions() == 0) {
+            ustats.total_simulated_cycles = stats.instruction_count > 0 ? static_cast<uint64_t>(stats.instruction_count * 1.2) : 0;
+            tinyarmsim::uarch::CoreStats core0;
+            core0.committed_instructions = stats.instruction_count;
+            core0.cycles = ustats.total_simulated_cycles;
+            ustats.cores.push_back(core0);
+        }
         ustats.wall_time_seconds = stats.elapsed_seconds;
-        ustats.total_simulated_cycles = stats.instruction_count > 0 ? static_cast<uint64_t>(stats.instruction_count * 1.2) : 0;
-        tinyarmsim::uarch::CoreStats core0;
-        core0.committed_instructions = stats.instruction_count;
-        core0.cycles = ustats.total_simulated_cycles;
-        ustats.cores.push_back(core0);
 
         std::string stats_dump = ustats.format_text();
         std::cout << "\n" << stats_dump << "\n";

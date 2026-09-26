@@ -174,3 +174,9 @@ gtest_discover_tests(lsu_test)
 add_executable(ooo_core_test tests/uarch/ooo_core_test.cpp)
 target_link_libraries(ooo_core_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(ooo_core_test)
+
+# uArch MultiCoreSystem Concurrent Execution Test
+add_executable(multicore_system_test tests/uarch/multicore_system_test.cpp)
+target_link_libraries(multicore_system_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(multicore_system_test)
+
