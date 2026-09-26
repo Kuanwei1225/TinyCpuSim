@@ -340,6 +340,14 @@ public:
         global_history_ = ((global_history_ << 1) | (taken ? 1 : 0));
     }
 
+    void restore_history(uint64_t history) noexcept {
+        global_history_ = history;
+    }
+
+    [[nodiscard]] uint64_t get_history() const noexcept {
+        return global_history_;
+    }
+
     void reset() {
         bimodal_.reset();
         for (auto& tbl : tables_) {
@@ -599,6 +607,10 @@ public:
         if (!config_.is_active()) return;
         if (config_.type == PredictorType::BIMODAL) {
             bimode_.squash_history(pred.bimode_hist.global_history, actual_taken);
+        } else if (config_.type == PredictorType::GSHARE) {
+            gshare_.restore_history((pred.bimode_hist.global_history << 1) | (actual_taken ? 1 : 0));
+        } else if (config_.type == PredictorType::TAGE) {
+            tage_.restore_history((pred.bimode_hist.global_history << 1) | (actual_taken ? 1 : 0));
         }
     }
 

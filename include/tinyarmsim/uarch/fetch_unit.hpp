@@ -61,6 +61,7 @@ public:
                 auto cache_res = l1i_->access(pc_, false, lat);
                 if (!cache_res.hit && cache_res.latency_cycles > 1) {
                     fetch_stall_cycles_ = cache_res.latency_cycles - 1;
+                    break; // Stall immediately on cache miss
                 }
             }
 
@@ -142,7 +143,6 @@ public:
         stalled_ = false;
         is_halted_ = false;
         fetch_stall_cycles_ = refill_penalty;
-        last_fetched_line_ = 0xFFFFFFFF;
     }
 
     [[nodiscard]] bool has_uops() const noexcept {
@@ -203,7 +203,6 @@ private:
     size_t max_queue_size_{16};
     uint64_t seq_counter_{0};
     uint32_t fetch_stall_cycles_{0};
-    uint32_t last_fetched_line_{0xFFFFFFFF};
 
     std::deque<UOp> uop_queue_;
     bool stalled_{false};
