@@ -197,5 +197,10 @@ add_executable(bpu_frontend_ubench_test tests/uarch/bpu_frontend_ubench_test.cpp
 target_link_libraries(bpu_frontend_ubench_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(bpu_frontend_ubench_test)
 
+# uArch Execution Engine and LSU Isolated Microbenchmarks
+add_executable(exec_lsu_ubench_test tests/uarch/exec_lsu_ubench_test.cpp)
+target_link_libraries(exec_lsu_ubench_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(exec_lsu_ubench_test)
+
 
 
