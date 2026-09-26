@@ -113,11 +113,12 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Error: --uarch-config requires a file path argument.\n";
                 return 1;
             }
-        } else if (arg == "--uarch-stats") {
+        } else if (arg == "--uarch-stats" || arg == "--perf-log" || arg == "-p") {
+            enable_uarch = true;
             if (i + 1 < argc) {
                 uarch_stats_path = argv[++i];
             } else {
-                std::cerr << "Error: --uarch-stats requires a file path argument.\n";
+                std::cerr << "Error: " << arg << " requires a file path argument.\n";
                 return 1;
             }
         } else if (arg == "-c" || arg == "--coverage") {
