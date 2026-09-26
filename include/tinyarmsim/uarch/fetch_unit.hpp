@@ -30,9 +30,14 @@ public:
           branch_pred_(bp_cfg),
           fetch_width_(core_cfg.fetch_width > 0 ? core_cfg.fetch_width : 4),
           max_queue_size_(16),
-          seq_counter_(0) {}
+          seq_counter_(0),
+          fetch_stall_cycles_(0) {}
 
     void tick() {
+        if (fetch_stall_cycles_ > 0) {
+            fetch_stall_cycles_--;
+            return;
+        }
         if (stalled_ || is_halted_) return;
 
         // Fetch up to fetch_width instructions per cycle
@@ -50,8 +55,11 @@ public:
 
             // Access L1I cache if active
             if (l1i_ && l1i_->get_config().is_active()) {
-                uint32_t lat = 0;
-                l1i_->access(pc_, false, lat);
+                uint32_t lat = 1;
+                auto cache_res = l1i_->access(pc_, false, lat);
+                if (!cache_res.hit && cache_res.latency_cycles > 1) {
+                    fetch_stall_cycles_ = cache_res.latency_cycles - 1;
+                }
             }
 
             uint16_t w1 = bus_.read16(pc_);
@@ -126,11 +134,12 @@ public:
     }
 
     // Flush front-end on branch misprediction or exception recovery
-    void flush(uint32_t target_pc) noexcept {
+    void flush(uint32_t target_pc, uint32_t refill_penalty = 0) noexcept {
         uop_queue_.clear();
         pc_ = target_pc & ~1u;
         stalled_ = false;
         is_halted_ = false;
+        fetch_stall_cycles_ = refill_penalty;
     }
 
     [[nodiscard]] bool has_uops() const noexcept {
@@ -190,6 +199,7 @@ private:
     uint32_t fetch_width_{4};
     size_t max_queue_size_{16};
     uint64_t seq_counter_{0};
+    uint32_t fetch_stall_cycles_{0};
 
     std::deque<UOp> uop_queue_;
     bool stalled_{false};

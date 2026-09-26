@@ -106,6 +106,7 @@ struct UOp {
     bool mem_forwarded{false};      // Hit in store-to-load forwarding
 
     // Pipeline tracking states
+    uint64_t ready_cycle{0};
     bool executed{false};
     bool ready_to_commit{false};
     bool is_squashed{false};

@@ -42,7 +42,7 @@ def main():
             gem5_bin,
             f"--outdir={outdir}",
             gem5_config,
-            "--cpu=minor",
+            "--cpu=o3",
             elf
         ]
         

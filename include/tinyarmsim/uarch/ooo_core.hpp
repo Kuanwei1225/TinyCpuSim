@@ -268,26 +268,31 @@ private:
     }
 
     void stage_writeback() {
+        std::vector<UOp> pending;
         for (const auto& uop : exec_to_wb_buffer_) {
-            if (uop.phys_dest != UOp::INVALID_REG && uop.phys_dest < prf_.size()) {
-                prf_.write(uop.phys_dest, uop.mem_data);
-                iq_.wakeup(uop.phys_dest);
-                for (auto& r_uop : rename_queue_) {
-                    if (r_uop.phys_src1 == uop.phys_dest) r_uop.src1_ready = true;
-                    if (r_uop.phys_src2 == uop.phys_dest) r_uop.src2_ready = true;
-                    if (r_uop.phys_src3 == uop.phys_dest) r_uop.src3_ready = true;
+            if (cycles_ >= uop.ready_cycle) {
+                if (uop.phys_dest != UOp::INVALID_REG && uop.phys_dest < prf_.size()) {
+                    prf_.write(uop.phys_dest, uop.mem_data);
+                    iq_.wakeup(uop.phys_dest);
+                    for (auto& r_uop : rename_queue_) {
+                        if (r_uop.phys_src1 == uop.phys_dest) r_uop.src1_ready = true;
+                        if (r_uop.phys_src2 == uop.phys_dest) r_uop.src2_ready = true;
+                        if (r_uop.phys_src3 == uop.phys_dest) r_uop.src3_ready = true;
+                    }
                 }
-            }
-            if (uop.sets_flags && uop.phys_flags_dest < prf_.size()) {
-                prf_.write(uop.phys_flags_dest, uop.flags_val);
-                iq_.wakeup(uop.phys_flags_dest);
-                for (auto& r_uop : rename_queue_) {
-                    if (r_uop.phys_flags_src == uop.phys_flags_dest) r_uop.flags_src_ready = true;
+                if (uop.sets_flags && uop.phys_flags_dest < prf_.size()) {
+                    prf_.write(uop.phys_flags_dest, uop.flags_val);
+                    iq_.wakeup(uop.phys_flags_dest);
+                    for (auto& r_uop : rename_queue_) {
+                        if (r_uop.phys_flags_src == uop.phys_flags_dest) r_uop.flags_src_ready = true;
+                    }
                 }
+                rob_.mark_completed(uop.rob_idx);
+            } else {
+                pending.push_back(uop);
             }
-            rob_.mark_completed(uop.rob_idx);
         }
-        exec_to_wb_buffer_.clear();
+        exec_to_wb_buffer_ = std::move(pending);
     }
 
     void stage_execute() {
@@ -319,6 +324,7 @@ private:
             uint32_t result = 0;
             bool sets_dest = (uop.arch_dest != UOp::INVALID_REG && uop.phys_dest < prf_.size());
             bool n = false, z = false, c = false, v = false;
+            uint32_t op_lat = 1;
 
             switch (uop.opcode) {
                 case Opcode::MOV:
@@ -493,6 +499,7 @@ private:
                 }
                 uop.mem_data = l_res.data;
                 result = l_res.data;
+                op_lat = l_res.latency_cycles > 0 ? l_res.latency_cycles : 1;
                 if (debug_) {
                     std::cout << " [LOAD_EXEC] type=" << static_cast<int>(uop.type) << " addr=0x" << std::hex << uop.mem_addr
                               << " val1=0x" << val1 << " offset=" << std::dec << uop.offset
@@ -517,6 +524,12 @@ private:
                 }
             }
 
+            if (uop.type == UOpType::MUL || uop.opcode == Opcode::MUL || uop.opcode == Opcode::MLA) {
+                op_lat = 3;
+            } else if (uop.type == UOpType::DIV) {
+                op_lat = 12;
+            }
+
             if (debug_) {
                 std::cout << " [EXEC] uop type=" << static_cast<int>(uop.type)
                           << " seq=" << uop.seq_num << " pc=0x" << std::hex << uop.pc << std::dec
@@ -527,6 +540,7 @@ private:
                 uop.mem_data = result;
             }
 
+            uop.ready_cycle = cycles_ + (op_lat > 0 ? (op_lat - 1) : 0);
             uop.executed = true;
             exec_to_wb_buffer_.push_back(uop);
         }
@@ -728,7 +742,7 @@ private:
                            [&](const UOp& u) { return u.seq_num > branch_uop.seq_num; }),
             rename_queue_.end());
         rat_.restore_checkpoint(branch_uop.rat_checkpoint);
-        fetch_unit_.flush(redirect_target);
+        fetch_unit_.flush(redirect_target, 4);
     }
 
     void recover_from_memory_violation(size_t violating_rob_idx) {
@@ -790,7 +804,7 @@ private:
                 curr = (curr + 1) % rob_.capacity();
             }
         }
-        fetch_unit_.flush(redirect_pc);
+        fetch_unit_.flush(redirect_pc, 4);
     }
 
     size_t core_id_{0};
