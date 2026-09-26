@@ -203,21 +203,97 @@ Configuration files located in `configs/` allow fine-grained customization of co
 
 ## Testing & Microbenchmarks
 
-TinyCpuSim includes a comprehensive regression test suite with **156 isolated unit tests and component microbenchmarks** covering all critical corner cases.
+TinyCpuSim features a two-tiered testing methodology:
+1. **Isolated Component Microbenchmarks (uBench)**: Fine-grained, cycle-by-cycle C++ unit tests to verify and stress individual submodules (BPU, PRF, Issue Queue, LSU, ROB, Caches) in isolation.
+2. **End-to-End Bare-Metal ELF Benchmarks**: Full-system simulations on compiled ARM bare-metal binaries compared against **gem5**.
 
-To execute the full test suite:
+---
 
+### Running All Tests
+To run the complete test suite (156+ unit tests & microbenchmarks):
 ```bash
 ./scripts/run_tests.sh
 ```
 *(Or run `ctest --test-dir build --output-on-failure`)*
 
-### Component Microbenchmark Suites:
-1. **Branch Prediction (`bpu_frontend_ubench_test.cpp`)**: Tight loops, alternating patterns (TNTN), deep call-return RAS nesting, indirect target thrashing, TAGE branch correlation, and BTB aliasing.
-2. **Frontend & PRF (`bpu_frontend_ubench_test.cpp`)**: Cross-cacheline fetches, PRF exhaustion stalls, flags renaming wakeups, multi-uOp macro-expansions, and speculative RAT checkpoint restores.
-3. **Execution & LSU (`exec_lsu_ubench_test.cpp`)**: RAW dependency latency, pipelined multiplier/divider latency, issue width saturation, age-ordered issue priority, exact store-to-load forwarding, store-data pending replays, and memory order violation recovery.
-4. **ROB & Top-Down Profiler (`rob_topdown_ubench_test.cpp`)**: Sustained retirement throughput, head-of-ROB blocking, circular buffer wrap-around, branch misprediction flushing, slot conservation invariants, and bottleneck Pareto ranking.
-5. **Cache & Coherence (`cache_ubench_test.cpp`)**: Hit latency, LRU replacement associativity, dirty write-back evictions, MSHR non-blocking allocation, MESI state transitions, and shared L2 hierarchy inclusion.
+---
+
+### Running Component Microbenchmarks (uBench)
+
+For rapid iterative development and submodule replacement (e.g. swapping in a new branch predictor, implementing a new LSU forwarding network, or hooking an external RTL co-simulator), use `./scripts/run_ubench.sh`:
+
+```bash
+# 1. Run all isolated microbenchmarks
+./scripts/run_ubench.sh all
+
+# 2. Run Branch Prediction & Frontend microbenchmarks (12 tests)
+./scripts/run_ubench.sh bpu
+
+# 3. Run Execution Engine & LSU / Forwarding microbenchmarks (12 tests)
+./scripts/run_ubench.sh exec
+
+# 4. Run Reorder Buffer (ROB) & Top-Down Profiler microbenchmarks (11 tests)
+./scripts/run_ubench.sh rob
+
+# 5. Run Cache Hierarchy, MSHR & MESI Coherence microbenchmarks (6 tests)
+./scripts/run_ubench.sh cache
+
+# 6. Run a specific test case with GoogleTest filter
+./scripts/run_ubench.sh exec --gtest_filter=*ExactStoreToLoadForwarding*
+./scripts/run_ubench.sh bpu  --gtest_filter=*CorrelatedBranchesTAGE*
+./scripts/run_ubench.sh rob  --gtest_filter=*BottleneckParetoRanking*
+./scripts/run_ubench.sh cache --gtest_filter=*MesiCoherence*
+```
+
+### Component Microbenchmark Suites Breakdown:
+1. **Branch Prediction & Frontend (`bpu_frontend_ubench_test.cpp`)**:
+   - `BPU_UBench_TightLoopAlwaysTaken`: 2-bit saturating counter warmup & sustained loop prediction.
+   - `BPU_UBench_AlternatingPatternTNTN`: Periodic T-N-T-N branch pattern tracking.
+   - `BPU_UBench_DeepNestedCallReturnRAS`: 16-level deep call/return stack recovery.
+   - `BPU_UBench_IndirectCallTargetThrashing`: Dynamic indirect function pointer resolution.
+   - `BPU_UBench_CorrelatedBranchesTAGE`: Long history geometric correlation via TAGE tables.
+   - `BPU_UBench_BranchTargetBufferAliasStress`: BTB direct target caching and collision resilience.
+   - `Frontend_UBench_CrossCacheLineFetch`: 32-bit Thumb-2 instructions spanning 64B cache line boundaries.
+   - `Frontend_UBench_PrfExhaustionStall`: Zero-leakage stall & recovery under physical register starvation.
+   - `Frontend_UBench_FlagsRenamingWakeup`: Speculative CPSR/flags dependency rename & broadcast.
+   - `Frontend_UBench_MultiUopExpansionThroughput`: Multi-uOp macro-instruction expansions (e.g. `PUSH`/`POP`).
+   - `Frontend_UBench_SpeculativeCheckpointRestore`: Exact RAT rollback on branch mispredictions.
+   - `Frontend_UBench_DecoderIllegalOpcodeFault`: Undefined instruction decode fault trapping.
+
+2. **Execution & LSU (`exec_lsu_ubench_test.cpp`)**:
+   - `Exec_UBench_RawDependencyChainLatency`: Strict RAW latency serialization.
+   - `Exec_UBench_MulDivPipelinedLatency`: Pipelined multi-cycle integer arithmetic.
+   - `Exec_UBench_MaxIssueWidthSaturation`: Sustained N-wide superscalar throughput.
+   - `Exec_UBench_AgeOrderedContentionIssue`: Age-based issue priority under resource contention.
+   - `Exec_UBench_OutOfOrderConditionEvaluation`: Speculative condition code evaluation.
+   - `Exec_UBench_ExecutionPortContention`: Multi-port execution binding and arbitration.
+   - `LSU_UBench_ExactStoreToLoadForwarding`: 0-cycle store-queue to load bypass forwarding.
+   - `LSU_UBench_StoreDataPendingReplay`: Safe stall and replay when store data is unready.
+   - `LSU_UBench_MemoryOrderViolationDetection`: Store vs speculative load address collision squashing.
+   - `LSU_UBench_L1CacheHitVsMissLatency`: Accurate hit vs miss cycle penalty differential.
+   - `LSU_UBench_StridedAccessCacheThrashing`: Cache thrashing under non-contiguous strides.
+   - `LSU_UBench_LoadStoreQueueWrapAround`: Circular LSQ head/tail index wrap-around stress.
+
+3. **ROB & Top-Down Profiler (`rob_topdown_ubench_test.cpp`)**:
+   - `ROB_UBench_SustainedRetireThroughput`: Sustained maximum commit width.
+   - `ROB_UBench_HeadOfRobBlockingRetire`: In-order commit stalling on uncompleted head entry.
+   - `ROB_UBench_CircularBufferWrapAroundStress`: 1000+ instruction ROB index wraparound.
+   - `ROB_UBench_SpeculativeStoreDrainOnRetire`: Committed store buffer draining to memory.
+   - `ROB_UBench_MultipleBranchMispredictFlushes`: Consecutive branch squash and younger uop purge.
+   - `ROB_UBench_IsYoungerCircularAgeDistance`: High-precision circular age comparison.
+   - `TopDown_UBench_SlotConservationInvariant`: Mathematical slot conservation law (`Sum == Total Slots`).
+   - `TopDown_UBench_FrontendVsBackendBreakdown`: Quantitative stall slot classification.
+   - `TopDown_UBench_BadSpeculationAccounting`: Slot waste tracking during mispredicted execution paths.
+   - `ROB_UBench_RoiBoundaryResetStats`: Atomic stats reset at ROI boundary markers (`m5ops`).
+   - `TopDown_UBench_BottleneckParetoRanking`: Automatic identification of primary performance bottlenecks.
+
+4. **Cache & Coherence (`cache_ubench_test.cpp`)**:
+   - `Cache_UBench_L1HitLatencyAndThroughput`: Single-cycle L1 cache access timing.
+   - `Cache_UBench_LruReplacementSetAssociativity`: LRU set associativity replacement correctness.
+   - `Cache_UBench_WriteBackDirtyEviction`: Dirty line eviction and memory writeback.
+   - `Cache_UBench_MshrNonBlockingAllocation`: Non-blocking hit-under-miss via MSHR registers.
+   - `Cache_UBench_MesiCoherenceStateTransitions`: MESI protocol transitions (Modified/Exclusive/Shared/Invalid).
+   - `Cache_UBench_SharedL2HierarchicalInclusion`: Inclusive shared L2 cache behavior.
 
 ---
 
