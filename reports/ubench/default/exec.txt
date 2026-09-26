@@ -2,7 +2,7 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       Execution Engine & LSU (exec)
-  Generation Timestamp:  2026-09-27 00:12:31
+  Generation Timestamp:  2026-09-27 00:20:58
   Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
   Representative ELF:    test_store_forward.elf
   Test Pass Count:       12 / 12
@@ -57,8 +57,8 @@ Starting simulation...
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 19
-Elapsed Time:       0.000030 s
-Simulation Speed:   638655.46 inst/s (0.64 MIPS)
+Elapsed Time:       0.000048 s
+Simulation Speed:   394805.19 inst/s (0.39 MIPS)
 ============================================================
 
 
@@ -74,10 +74,10 @@ Aggregate Throughput (IPC):1.000 inst/cycle (uOp IPC: 1.158)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.000030 s
-  Simulation Speed:        0.64 M-Ticks/s
-  Simulation MIPS:         0.64 MIPS
-  Simulation Slowdown:     1565.8x
+  Host Wall-Clock Time:    0.000048 s
+  Simulation Speed:        0.39 M-Ticks/s
+  Simulation MIPS:         0.39 MIPS
+  Simulation Slowdown:     2532.9x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  19 / 22 (uOp Ratio: 1.16x)
@@ -110,7 +110,7 @@ Active Core Count:         1
     Direct Cond / Uncond:  3 / 0
     Calls / Returns:       0 / 0
     Indirect Branches:     0
-    BTB Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    BTB Hits / Misses:     0 / 3 (Hit Rate: 0.00%)
     RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
     RAS Pushes / Pops:     0 / 0
     TAGE Provider Hits:    0

@@ -2,7 +2,7 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       Cache Hierarchy & MESI (cache)
-  Generation Timestamp:  2026-09-27 00:12:31
+  Generation Timestamp:  2026-09-27 00:20:58
   Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
   Representative ELF:    test_mem_stride.elf
   Test Pass Count:       6 / 6
@@ -14,7 +14,7 @@
     • uops: 289
     • branch_acc: 90.2
     • branch_mispredicts: 4
-    • btb_hit_rate: 0.0
+    • btb_hit_rate: 89.47
     • ras_hit_rate: 0.0
     • l1i_hit_rate: 99.73
     • l1d_hit_rate: 92.68
@@ -52,7 +52,7 @@ SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 257
 Elapsed Time:       0.000027 s
-Simulation Speed:   9359749.44 inst/s (9.36 MIPS)
+Simulation Speed:   9698113.21 inst/s (9.70 MIPS)
 ============================================================
 
 
@@ -69,9 +69,9 @@ Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
   Host Wall-Clock Time:    0.000027 s
-  Simulation Speed:        5.06 M-Ticks/s
-  Simulation MIPS:         9.36 MIPS
-  Simulation Slowdown:     197.5x
+  Simulation Speed:        5.25 M-Ticks/s
+  Simulation MIPS:         9.70 MIPS
+  Simulation Slowdown:     190.6x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  257 / 289 (uOp Ratio: 1.12x)
@@ -104,7 +104,7 @@ Active Core Count:         1
     Direct Cond / Uncond:  41 / 0
     Calls / Returns:       0 / 0
     Indirect Branches:     0
-    BTB Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    BTB Hits / Misses:     51 / 6 (Hit Rate: 89.47%)
     RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
     RAS Pushes / Pops:     0 / 0
     TAGE Provider Hits:    0

@@ -132,6 +132,7 @@ public:
         s.port_branch_uops = port_branch_uops_;
         s.port_lsu_uops = port_lsu_uops_;
 
+        s.branch = fetch_unit_.get_branch_predictor().get_stats();
         s.branch.predictions = branch_pred_count_;
         s.branch.mispredictions = branch_flushes_;
         s.branch.correct_predictions = (branch_pred_count_ >= branch_flushes_) ? (branch_pred_count_ - branch_flushes_) : 0;

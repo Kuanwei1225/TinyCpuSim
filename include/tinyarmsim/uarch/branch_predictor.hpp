@@ -70,12 +70,12 @@ public:
     }
 
     [[nodiscard]] bool predict(uint32_t pc) const noexcept {
-        size_t idx = (pc >> 2) & mask_;
+        size_t idx = (pc >> 1) & mask_;
         return table_[idx].is_taken();
     }
 
     void update(uint32_t pc, bool taken) noexcept {
-        size_t idx = (pc >> 2) & mask_;
+        size_t idx = (pc >> 1) & mask_;
         table_[idx].update(taken);
     }
 
@@ -130,7 +130,7 @@ public:
 
 private:
     [[nodiscard]] size_t compute_index(uint32_t pc, uint64_t history) const noexcept {
-        size_t pc_hash = (pc >> 2);
+        size_t pc_hash = (pc >> 1);
         return (pc_hash ^ (history & history_mask_)) & mask_;
     }
 
@@ -271,13 +271,13 @@ private:
     [[nodiscard]] size_t get_table_index(int table_idx, uint32_t pc) const noexcept {
         const auto& tbl = tables_[static_cast<size_t>(table_idx)];
         uint64_t hist = global_history_ & ((1ULL << tbl.history_length) - 1);
-        return ((pc >> 2) ^ hist ^ (hist >> 5)) & tbl.mask;
+        return ((pc >> 1) ^ hist ^ (hist >> 5)) & tbl.mask;
     }
 
     [[nodiscard]] uint16_t get_table_tag(int table_idx, uint32_t pc) const noexcept {
         const auto& tbl = tables_[static_cast<size_t>(table_idx)];
         uint64_t hist = global_history_ & ((1ULL << tbl.history_length) - 1);
-        return static_cast<uint16_t>(((pc >> 4) ^ (hist << 1) ^ (hist >> 7)) & 0xFFFF);
+        return static_cast<uint16_t>(((pc >> 1) ^ (hist << 1) ^ (hist >> 7)) & 0xFFFF);
     }
 
     BimodalPredictor bimodal_;
@@ -305,9 +305,9 @@ public:
     }
 
     [[nodiscard]] bool lookup(uint32_t pc, uint32_t& out_target, BranchType& out_type) const noexcept {
-        size_t idx = (pc >> 2) & mask_;
+        size_t idx = (pc >> 1) & mask_;
         const auto& entry = entries_[idx];
-        if (entry.valid && entry.tag == (pc >> 2)) {
+        if (entry.valid && entry.tag == (pc >> 1)) {
             out_target = entry.target;
             out_type = entry.type;
             return true;
@@ -316,8 +316,8 @@ public:
     }
 
     void update(uint32_t pc, uint32_t target, BranchType type) noexcept {
-        size_t idx = (pc >> 2) & mask_;
-        entries_[idx].tag = (pc >> 2);
+        size_t idx = (pc >> 1) & mask_;
+        entries_[idx].tag = (pc >> 1);
         entries_[idx].target = target;
         entries_[idx].type = type;
         entries_[idx].valid = true;
@@ -407,11 +407,14 @@ public:
         BranchType btb_type = BranchType::DIRECT_COND;
         bool btb_hit = btb_.lookup(pc, btb_target, btb_type);
 
-        if (!btb_hit) {
+        if (btb_hit) {
+            stats_.btb_hits++;
+        } else {
+            stats_.btb_misses++;
             // Not a known branch in BTB
             pred.is_branch = false;
             pred.taken = false;
-            pred.target_pc = pc + 4;
+            pred.target_pc = pc + 2;
             return pred;
         }
 
@@ -422,9 +425,12 @@ public:
         if (btb_type == BranchType::RETURN) {
             uint32_t ras_target = 0;
             if (ras_.peek(ras_target)) {
+                stats_.ras_hits++;
                 pred.taken = true;
                 pred.target_pc = ras_target;
                 return pred;
+            } else {
+                stats_.ras_misses++;
             }
         }
 
@@ -449,6 +455,9 @@ public:
                 dir_taken = tage_res.taken;
                 pred.provider_table = static_cast<int8_t>(tage_res.provider_table);
                 pred.alt_used = (tage_res.provider_table != -1 && tage_res.taken != tage_res.alt_taken);
+                if (tage_res.provider_table != -1) {
+                    stats_.tage_hits++;
+                }
                 break;
             }
             case PredictorType::IDEAL:
@@ -458,7 +467,7 @@ public:
         }
 
         pred.taken = dir_taken;
-        pred.target_pc = dir_taken ? btb_target : (pc + 4);
+        pred.target_pc = dir_taken ? btb_target : (pc + 2);
         return pred;
     }
 
@@ -490,8 +499,10 @@ public:
 
         // RAS updates on call/return
         if (type == BranchType::DIRECT_CALL || type == BranchType::INDIRECT_CALL) {
+            stats_.ras_pushes++;
             ras_.push(pc + 4);
         } else if (type == BranchType::RETURN) {
+            stats_.ras_pops++;
             uint32_t popped_pc = 0;
             static_cast<void>(ras_.pop(popped_pc));
         }
@@ -503,10 +514,12 @@ public:
         tage_.reset();
         btb_.reset();
         ras_.reset();
+        stats_ = BranchStats{};
     }
 
     [[nodiscard]] ReturnAddressStack& get_ras() noexcept { return ras_; }
     [[nodiscard]] BranchTargetBuffer& get_btb() noexcept { return btb_; }
+    [[nodiscard]] const BranchStats& get_stats() const noexcept { return stats_; }
 
 private:
     BranchPredictorConfig config_;
@@ -515,6 +528,7 @@ private:
     TagePredictor tage_;
     BranchTargetBuffer btb_;
     ReturnAddressStack ras_;
+    BranchStats stats_{};
 };
 
 } // namespace tinyarmsim::uarch

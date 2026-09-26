@@ -177,6 +177,10 @@ public:
         return branch_pred_;
     }
 
+    [[nodiscard]] const CompositeBranchPredictor& get_branch_predictor() const noexcept {
+        return branch_pred_;
+    }
+
 private:
     uint32_t pc_{0};
     MemoryBus& bus_;
