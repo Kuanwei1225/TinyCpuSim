@@ -195,16 +195,36 @@ def parse_perf_output(output_text):
     m = re.search(r'Total Committed Insts:\s+(\d+)', output_text)
     if m: stats['insts'] = int(m.group(1))
 
+    m = re.search(r'Total Committed uOps:\s+(\d+)', output_text)
+    if m: stats['uops'] = int(m.group(1))
+
     m = re.search(r'Aggregate Throughput \(IPC\):\s*([\d\.]+)', output_text)
     if m: stats['ipc'] = float(m.group(1))
+
+    m = re.search(r'uOp IPC:\s*([\d\.]+)', output_text)
+    if m: stats['uop_ipc'] = float(m.group(1))
+
+    m = re.search(r'uOp Ratio:\s*([\d\.]+)x', output_text)
+    if m: stats['uop_ratio'] = float(m.group(1))
 
     m = re.search(r'Branch Predictions:\s+(\d+)\s+\(Accuracy:\s*([\d\.]+)%\)', output_text)
     if m:
         stats['branch_preds'] = int(m.group(1))
         stats['branch_acc'] = float(m.group(2))
 
-    m = re.search(r'Branch Mispredicts:\s+(\d+)', output_text)
-    if m: stats['branch_mispredicts'] = int(m.group(1))
+    m = re.search(r'Branch Mispredicts:\s+(\d+)\s+\(Penalty Flushes:\s*(\d+)\)', output_text)
+    if m:
+        stats['branch_mispredicts'] = int(m.group(1))
+        stats['branch_flushes'] = int(m.group(2))
+    else:
+        m2 = re.search(r'Branch Mispredicts:\s+(\d+)', output_text)
+        if m2: stats['branch_mispredicts'] = int(m2.group(1))
+
+    m = re.search(r'BTB Hits / Misses:\s+\d+\s+/\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', output_text)
+    if m: stats['btb_hit_rate'] = float(m.group(1))
+
+    m = re.search(r'RAS Hits / Misses:\s+\d+\s+/\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', output_text)
+    if m: stats['ras_hit_rate'] = float(m.group(1))
 
     m = re.search(r'L1I Cache Hit Rate:\s*([\d\.]+)%', output_text)
     if m: stats['l1i_hit_rate'] = float(m.group(1))
@@ -212,8 +232,18 @@ def parse_perf_output(output_text):
     m = re.search(r'L1D Cache Hit Rate:\s*([\d\.]+)%', output_text)
     if m: stats['l1d_hit_rate'] = float(m.group(1))
 
-    m = re.search(r'Store-to-Load Forwards:\s+(\d+)', output_text)
-    if m: stats['store_forwards'] = int(m.group(1))
+    m = re.search(r'L2 Hits / Misses:\s+\d+\s+/\s+\d+\s+\(Hit Rate:\s*([\d\.]+)%\)', output_text)
+    if m: stats['l2_hit_rate'] = float(m.group(1))
+
+    m = re.search(r'Loads / Stores:\s+(\d+)\s+/\s+(\d+)', output_text)
+    if m:
+        stats['loads'] = int(m.group(1))
+        stats['stores'] = int(m.group(2))
+
+    m = re.search(r'Store-to-Load Forwards:\s+(\d+)(?:\s+\(Rate:\s*([\d\.]+)%\))?', output_text)
+    if m:
+        stats['store_forwards'] = int(m.group(1))
+        if m.group(2): stats['forwarding_rate'] = float(m.group(2))
 
     m = re.search(r'Mem Order Violations:\s+(\d+)', output_text)
     if m: stats['mem_order_violations'] = int(m.group(1))
@@ -223,6 +253,17 @@ def parse_perf_output(output_text):
 
     m = re.search(r'RS/IQ Full Stalls:\s+(\d+)', output_text)
     if m: stats['rs_stalls'] = int(m.group(1))
+
+    m = re.search(r'PRF Exhaustion Stalls:\s+(\d+)', output_text)
+    if m: stats['prf_stalls'] = int(m.group(1))
+
+    m = re.search(r'LQ / SQ Full Stalls:\s+(\d+)\s+/\s+(\d+)', output_text)
+    if m:
+        stats['lq_stalls'] = int(m.group(1))
+        stats['sq_stalls'] = int(m.group(2))
+
+    m = re.search(r'Head-of-ROB Stalls:\s+(\d+)', output_text)
+    if m: stats['head_rob_stalls'] = int(m.group(1))
 
     m = re.search(r'Frontend Bound:\s*([\d\.]+)%', output_text)
     if m: stats['frontend_bound'] = float(m.group(1))
@@ -236,6 +277,20 @@ def parse_perf_output(output_text):
     m = re.search(r'Retiring:\s*([\d\.]+)%', output_text)
     if m: stats['retiring'] = float(m.group(1))
 
+    m = re.search(r'Port ALU uOps:\s+(\d+)', output_text)
+    if m: stats['port_alu'] = int(m.group(1))
+
+    m = re.search(r'Port Branch uOps:\s+(\d+)', output_text)
+    if m: stats['port_branch'] = int(m.group(1))
+
+    m = re.search(r'Port LSU uOps:\s+(\d+)', output_text)
+    if m: stats['port_lsu'] = int(m.group(1))
+
+    m = re.search(r'L1D MSHR Allocations:\s+(\d+)\s+\(Stalls:\s*(\d+)\)', output_text)
+    if m:
+        stats['l1d_mshr_allocs'] = int(m.group(1))
+        stats['l1d_mshr_stalls'] = int(m.group(2))
+
     return stats
 
 def generate_config_with_overrides(base_path, overrides):
@@ -244,7 +299,19 @@ def generate_config_with_overrides(base_path, overrides):
         with open(base_path, 'r') as f:
             content = f.read()
     else:
-        content = """[core]
+        content = """[simulation]
+elf_path = tests/fixtures/test_fibonacci.elf
+mode = uarch
+all_perf = true
+enable_topdown = true
+
+[system]
+num_cores = 1
+dram_latency_cycles = 80
+enable_mesi_coherence = true
+
+[core]
+enable_ooo = true
 fetch_width = 4
 decode_width = 4
 rename_width = 4
@@ -263,27 +330,36 @@ ras_size = 32
 tage_tables = 4
 
 [lsu]
+enabled = true
 lq_size = 16
 sq_size = 16
 enable_store_forwarding = true
 enable_speculative_load = true
+store_forward_latency = 1
 
 [cache_l1i]
+enabled = true
 size_bytes = 32768
 associativity = 4
 line_size = 64
 hit_latency_cycles = 1
+mshr_entries = 8
 
 [cache_l1d]
+enabled = true
 size_bytes = 32768
 associativity = 4
 line_size = 64
 hit_latency_cycles = 1
+mshr_entries = 8
 
 [cache_l2]
+enabled = true
 size_bytes = 524288
 associativity = 8
+line_size = 64
 hit_latency_cycles = 10
+mshr_entries = 16
 """
     lines = content.splitlines()
     for sec, key, val in overrides:
@@ -313,56 +389,138 @@ def run_sim(sim_bin, elf_file, cfg_file):
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return parse_perf_output(res.stdout), res.stdout
 
-def print_comparison_table(elf_name, changed_params, base_stats, exp_stats):
-    print("\n" + "=" * 78)
-    print(f"       Experiment Comparison Report: [{os.path.basename(elf_name)}]")
-    print("=" * 78)
-    
-    if changed_params:
-        print("  Active Hardware Parameter Modifications:")
-        for sec, key, old_v, new_v in changed_params:
-            print(f"    - [{sec}] {key}: {old_v}  -->  \033[1;32m{new_v}\033[0m")
-        print("-" * 78)
-
-    print(f"  {'Hardware Metric':<30} | {'Baseline':<12} | {'Experiment':<12} | {'Delta (%)':<12}")
-    print("  " + "-" * 74)
-
-    metrics = [
-        ('cycles', 'Simulated Total Cycles', 'lower_is_better', ''),
-        ('insts', 'Committed Instructions', 'neutral', ''),
-        ('ipc', 'Throughput (IPC)', 'higher_is_better', ''),
-        ('branch_acc', 'Branch Predictor Accuracy', 'higher_is_better', '%'),
-        ('branch_mispredicts', 'Branch Mispredict Flushes', 'lower_is_better', ''),
-        ('l1i_hit_rate', 'L1I Cache Hit Rate', 'higher_is_better', '%'),
-        ('l1d_hit_rate', 'L1D Cache Hit Rate', 'higher_is_better', '%'),
-        ('store_forwards', 'Store-to-Load Forwards', 'neutral', ''),
-        ('rob_stalls', 'ROB Full Stalls', 'lower_is_better', ' cycles'),
-        ('rs_stalls', 'Issue Queue Full Stalls', 'lower_is_better', ' cycles'),
-        ('frontend_bound', 'TMAM Frontend Bound', 'lower_is_better', '%'),
-        ('bad_spec', 'TMAM Bad Speculation', 'lower_is_better', '%'),
-        ('backend_bound', 'TMAM Backend Bound', 'lower_is_better', '%'),
-        ('retiring', 'TMAM Retiring', 'higher_is_better', '%'),
-    ]
-
-    for key, label, direction, unit in metrics:
-        v_base = base_stats.get(key, 'N/A')
-        v_exp = exp_stats.get(key, 'N/A')
-        
-        delta_str = "---"
-        if isinstance(v_base, (int, float)) and isinstance(v_exp, (int, float)) and v_base > 0:
+def format_row(label, v_base, v_exp, unit="", lower_better=False, is_pct=False):
+    delta_str = "---"
+    if isinstance(v_base, (int, float)) and isinstance(v_exp, (int, float)):
+        if v_base > 0:
             delta = ((v_exp - v_base) / float(v_base)) * 100.0
             if abs(delta) < 0.001:
                 delta_str = "0.0%"
             else:
                 sign = "+" if delta > 0 else ""
-                delta_str = f"{sign}{delta:.2f}%"
+                # Coloring
+                if lower_better:
+                    color = "\033[1;32m" if delta < 0 else ("\033[1;31m" if delta > 0 else "")
+                else:
+                    color = "\033[1;32m" if delta > 0 else ("\033[1;31m" if delta < 0 else "")
+                delta_str = f"{color}{sign}{delta:.2f}%\033[0m"
+        elif v_base == 0 and v_exp > 0:
+            delta_str = f"\033[1;31m+{v_exp}\033[0m" if lower_better else f"\033[1;32m+{v_exp}\033[0m"
 
-        str_base = f"{v_base}{unit}" if v_base != 'N/A' else 'N/A'
-        str_exp = f"{v_exp}{unit}" if v_exp != 'N/A' else 'N/A'
+    fmt_base = f"{v_base:.2f}{unit}" if isinstance(v_base, float) else f"{v_base}{unit}" if v_base != 'N/A' else 'N/A'
+    fmt_exp = f"{v_exp:.2f}{unit}" if isinstance(v_exp, float) else f"{v_exp}{unit}" if v_exp != 'N/A' else 'N/A'
+    return f"  {label:<34} | {fmt_base:<13} | {fmt_exp:<13} | {delta_str:<12}"
 
-        print(f"  {label:<30} | {str_base:<12} | {str_exp:<12} | {delta_str:<12}")
+def print_comparison_table(elf_name, changed_params, base_stats, exp_stats):
+    print("\n" + "=" * 84)
+    print(f"       TinyCpuSim Microarchitectural Experiment Report: [{os.path.basename(elf_name)}]")
+    print("=" * 84)
+    
+    if changed_params:
+        print("  Active Hardware Parameter Overrides:")
+        for sec, key, old_v, new_v in changed_params:
+            print(f"    • [{sec}] {key}: {old_v}  -->  \033[1;32m{new_v}\033[0m")
+        print("-" * 84)
 
-    print("=" * 78)
+    # 1. Executive Summary
+    c_base = base_stats.get('cycles', 0)
+    c_exp = exp_stats.get('cycles', 0)
+    ipc_base = base_stats.get('ipc', 0.0)
+    ipc_exp = exp_stats.get('ipc', 0.0)
+
+    if c_base > 0 and c_exp > 0:
+        speedup = float(c_base) / float(c_exp)
+        if speedup >= 1.0:
+            verdict = f"\033[1;32mSPEEDUP: {speedup:.2f}x\033[0m (+{((speedup-1)*100):.1f}% faster)"
+        else:
+            slowdown = float(c_exp) / float(c_base)
+            verdict = f"\033[1;31mSLOWDOWN: {slowdown:.2f}x\033[0m ({((1.0 - speedup)*100):.1f}% slower)"
+        print(f"  Executive Impact: {verdict} | Baseline IPC: {ipc_base:.3f} -> Exp IPC: {ipc_exp:.3f}")
+        print("-" * 84)
+
+    print(f"  {'1. Overall Core Performance':<34} | {'Baseline':<13} | {'Experiment':<13} | {'Delta (%)':<12}")
+    print("  " + "-" * 80)
+    print(format_row("Simulated Total Cycles", base_stats.get('cycles', 'N/A'), exp_stats.get('cycles', 'N/A'), lower_better=True))
+    print(format_row("Throughput (IPC)", base_stats.get('ipc', 'N/A'), exp_stats.get('ipc', 'N/A'), lower_better=False))
+    print(format_row("uOp Throughput (uOp IPC)", base_stats.get('uop_ipc', 'N/A'), exp_stats.get('uop_ipc', 'N/A'), lower_better=False))
+    print(format_row("Committed Instructions", base_stats.get('insts', 'N/A'), exp_stats.get('insts', 'N/A'), lower_better=False))
+    print(format_row("Committed uOps", base_stats.get('uops', 'N/A'), exp_stats.get('uops', 'N/A'), lower_better=False))
+
+    # 2. TMAM Breakdown
+    print("\n  " + "-" * 80)
+    print(f"  {'2. Top-Down TMAM Breakdown':<34} | {'Baseline':<13} | {'Experiment':<13} | {'Delta (%)':<12}")
+    print("  " + "-" * 80)
+    print(format_row("Retiring (Useful Work)", base_stats.get('retiring', 'N/A'), exp_stats.get('retiring', 'N/A'), "%", lower_better=False))
+    print(format_row("Bad Speculation (Squashed)", base_stats.get('bad_spec', 'N/A'), exp_stats.get('bad_spec', 'N/A'), "%", lower_better=True))
+    print(format_row("Front-End Bound (Fetch/BTB)", base_stats.get('frontend_bound', 'N/A'), exp_stats.get('frontend_bound', 'N/A'), "%", lower_better=True))
+    print(format_row("Back-End Bound (Stalls)", base_stats.get('backend_bound', 'N/A'), exp_stats.get('backend_bound', 'N/A'), "%", lower_better=True))
+
+    # 3. Pipeline Stalls
+    print("\n  " + "-" * 80)
+    print(f"  {'3. Pipeline Stalls & Hazards':<34} | {'Baseline':<13} | {'Experiment':<13} | {'Delta (%)':<12}")
+    print("  " + "-" * 80)
+    print(format_row("Issue Queue (RS) Full Stalls", base_stats.get('rs_stalls', 'N/A'), exp_stats.get('rs_stalls', 'N/A'), " cyc", lower_better=True))
+    print(format_row("ROB Full Stalls", base_stats.get('rob_stalls', 'N/A'), exp_stats.get('rob_stalls', 'N/A'), " cyc", lower_better=True))
+    print(format_row("PRF FreeList Exhaustion Stalls", base_stats.get('prf_stalls', 'N/A'), exp_stats.get('prf_stalls', 'N/A'), " cyc", lower_better=True))
+    print(format_row("LQ / SQ Full Stalls", base_stats.get('lq_stalls', 'N/A'), exp_stats.get('lq_stalls', 'N/A'), " cyc", lower_better=True))
+    print(format_row("Head-of-ROB Stalls", base_stats.get('head_rob_stalls', 'N/A'), exp_stats.get('head_rob_stalls', 'N/A'), " cyc", lower_better=True))
+
+    # 4. Branch Predictor
+    print("\n  " + "-" * 80)
+    print(f"  {'4. Branch Predictor & Control':<34} | {'Baseline':<13} | {'Experiment':<13} | {'Delta (%)':<12}")
+    print("  " + "-" * 80)
+    print(format_row("Branch Predictor Accuracy", base_stats.get('branch_acc', 'N/A'), exp_stats.get('branch_acc', 'N/A'), "%", lower_better=False))
+    print(format_row("Branch Mispredict Penalty Flushes", base_stats.get('branch_mispredicts', 'N/A'), exp_stats.get('branch_mispredicts', 'N/A'), "", lower_better=True))
+    print(format_row("BTB Target Hit Rate", base_stats.get('btb_hit_rate', 'N/A'), exp_stats.get('btb_hit_rate', 'N/A'), "%", lower_better=False))
+    print(format_row("RAS Return Hit Rate", base_stats.get('ras_hit_rate', 'N/A'), exp_stats.get('ras_hit_rate', 'N/A'), "%", lower_better=False))
+
+    # 5. LSU & Memory Hierarchy
+    print("\n  " + "-" * 80)
+    print(f"  {'5. Memory & Cache Subsystem':<34} | {'Baseline':<13} | {'Experiment':<13} | {'Delta (%)':<12}")
+    print("  " + "-" * 80)
+    print(format_row("L1I Cache Hit Rate", base_stats.get('l1i_hit_rate', 'N/A'), exp_stats.get('l1i_hit_rate', 'N/A'), "%", lower_better=False))
+    print(format_row("L1D Cache Hit Rate", base_stats.get('l1d_hit_rate', 'N/A'), exp_stats.get('l1d_hit_rate', 'N/A'), "%", lower_better=False))
+    print(format_row("Shared L2 Cache Hit Rate", base_stats.get('l2_hit_rate', 'N/A'), exp_stats.get('l2_hit_rate', 'N/A'), "%", lower_better=False))
+    print(format_row("Store-to-Load Bypass Rate", base_stats.get('forwarding_rate', 'N/A'), exp_stats.get('forwarding_rate', 'N/A'), "%", lower_better=False))
+    print(format_row("L1D MSHR Saturation Stalls", base_stats.get('l1d_mshr_stalls', 'N/A'), exp_stats.get('l1d_mshr_stalls', 'N/A'), "", lower_better=True))
+
+    # 6. Automated Architectural Takeaways
+    print("\n" + "=" * 84)
+    print("  🔍 Automated Architectural Diagnosis & Key Takeaways:")
+    insights = []
+    
+    if c_base > 0 and c_exp > 0:
+        if c_exp < c_base:
+            ipc_gain = ((ipc_exp - ipc_base) / ipc_base) * 100.0
+            insights.append(f"• \033[1;32mThroughput Gain\033[0m: Execution speedup is +{((c_base-c_exp)/float(c_exp))*100:.1f}%, IPC improved by +{ipc_gain:.1f}%.")
+        elif c_exp > c_base:
+            ipc_loss = ((ipc_base - ipc_exp) / ipc_base) * 100.0
+            insights.append(f"• \033[1;31mPerformance Degradation\033[0m: Execution took {((c_exp-c_base)/float(c_base))*100:.1f}% more cycles, IPC dropped by -{ipc_loss:.1f}%.")
+
+    rs_diff = exp_stats.get('rs_stalls', 0) - base_stats.get('rs_stalls', 0)
+    if rs_diff > 50:
+        insights.append(f"• \033[1;33mIssue Queue Bottleneck\033[0m: Issue Queue / RS stalls increased by +{rs_diff} cycles (in-order serialization / dependency stalls).")
+
+    rob_diff = exp_stats.get('rob_stalls', 0) - base_stats.get('rob_stalls', 0)
+    if rob_diff > 50:
+        insights.append(f"• \033[1;33mROB Saturation\033[0m: ROB capacity limit caused +{rob_diff} stall cycles.")
+
+    flush_diff = exp_stats.get('branch_mispredicts', 0) - base_stats.get('branch_mispredicts', 0)
+    if flush_diff > 5:
+        insights.append(f"• \033[1;33mBranch Speculation Penalty\033[0m: Branch mispredict flushes increased by +{flush_diff}, worsening pipeline recovery overhead.")
+    elif flush_diff < -5:
+        insights.append(f"• \033[1;32mBranch Improvement\033[0m: Eliminated {abs(flush_diff)} branch mispredict flushes, smoothing frontend supply.")
+
+    be_diff = exp_stats.get('backend_bound', 0.0) - base_stats.get('backend_bound', 0.0)
+    if be_diff > 10.0:
+        insights.append(f"• \033[1;33mBackend Bound Shift\033[0m: Pipeline shifted +{be_diff:.1f}% deeper into Backend Bound slots.")
+
+    if not insights:
+        insights.append("• Performance metrics remained stable across baseline and experiment.")
+
+    for ins in insights:
+        print(f"  {ins}")
+    print("=" * 84)
 
 def main():
     parser = argparse.ArgumentParser(
