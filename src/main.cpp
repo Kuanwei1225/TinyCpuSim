@@ -71,6 +71,7 @@ int main(int argc, char* argv[]) {
     std::string topdown_format = "text";
     bool enable_log = false;
     bool enable_uarch = false;
+    bool enable_all_perf = false;
     bool enable_topdown = false;
     uint64_t max_steps = 1000000000;
 
@@ -105,6 +106,8 @@ int main(int argc, char* argv[]) {
             }
         } else if (arg.rfind("--topdown-format=", 0) == 0) {
             topdown_format = arg.substr(17);
+        } else if (arg == "--all-perf" || arg == "--verbose-perf") {
+            enable_all_perf = true;
         } else if (arg == "-u" || arg == "--uarch-config") {
             enable_uarch = true;
             if (i + 1 < argc) {
@@ -248,7 +251,7 @@ int main(int argc, char* argv[]) {
         }
         ustats.wall_time_seconds = stats.elapsed_seconds;
 
-        std::string stats_dump = ustats.format_text();
+        std::string stats_dump = ustats.format_text(enable_all_perf);
         std::cout << "\n" << stats_dump << "\n";
 
         if (!uarch_stats_path.empty()) {

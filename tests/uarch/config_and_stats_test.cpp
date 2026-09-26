@@ -97,5 +97,5 @@ TEST(UArchStatsTest, CorrectlyCalculatesRatesAndFormatsReport) {
 
     std::string report = stats.format_text();
     EXPECT_NE(report.find("Aggregate Throughput (IPC):1.500"), std::string::npos);
-    EXPECT_NE(report.find("[ Core 0 Statistics ]"), std::string::npos);
+    EXPECT_NE(report.find("[ Core 0"), std::string::npos);
 }

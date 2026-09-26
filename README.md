@@ -7,7 +7,7 @@
 
 **TinyCpuSim** is a high-performance, cycle-accurate Out-of-Order (OoO) superscalar CPU simulator and functional ISA emulator for ARMv7-M (Thumb-2) written in modern C++17.
 
-TinyCpuSim provides an end-to-end simulation environment featuring an advanced Tomasulo/ROB microarchitecture, non-blocking multi-level cache hierarchy with MESI coherence, Intel/ARM Top-Down microarchitecture analysis (TMAM), dynamic Region of Interest (ROI) profiling via `m5ops`, and automated golden accuracy calibration against **gem5**.
+TinyCpuSim provides an end-to-end simulation environment featuring an advanced Tomasulo/ROB microarchitecture, non-blocking multi-level cache hierarchy with MESI coherence, Intel/ARM Top-Down microarchitecture analysis (TMAM), comprehensive 40+ hardware performance counters, dynamic Region of Interest (ROI) profiling via `m5ops`, and automated golden accuracy calibration against **gem5**.
 
 ---
 
@@ -15,15 +15,16 @@ TinyCpuSim provides an end-to-end simulation environment featuring an advanced T
 
 - [Key Architectural Features](#key-architectural-features)
 - [System Requirements & Prerequisites](#system-requirements--prerequisites)
-- [Quickstart Guide](#quickstart-guide)
-- [Step-by-Step Usage & Commands](#step-by-step-usage--commands)
-  - [1. Building the Simulator](#1-building-the-simulator)
-  - [2. Running Out-of-Order (OoO) uArch Simulation](#2-running-out-of-order-ooo-uarch-simulation)
-  - [3. Running Pure Functional ISA Simulation](#3-running-pure-functional-isa-simulation)
-  - [4. Top-Down Profiling & Dynamic ROI (m5ops)](#4-top-down-profiling--dynamic-roi-m5ops)
-  - [5. Microarchitecture Configuration Presets](#5-microarchitecture-configuration-presets)
-- [Testing & Microbenchmarks](#testing--microbenchmarks)
-- [gem5 Golden Reference Accuracy Comparison](#gem5-golden-reference-accuracy-comparison)
+- [Quickstart Guide (1-Click Workflow)](#quickstart-guide-1-click-workflow)
+- [Sequential 5-Step Workflow Guide](#sequential-5-step-workflow-guide)
+  - [Step 1: Building the Simulator (`01_build.sh`)](#step-1-building-the-simulator-01_buildsh)
+  - [Step 2: Full Unit & Regression Tests (`02_run_tests.sh`)](#step-2-full-unit--regression-tests-02_run_testssh)
+  - [Step 3: Component Microbenchmarks & Sweeps (`03_run_ubench.sh`)](#step-3-component-microbenchmarks--sweeps-03_run_ubenchsh)
+  - [Step 4: Full-System Simulation & Custom Configs (`04_run_simulation.sh`)](#step-4-full-system-simulation--custom-configs-04_run_simulationsh)
+  - [Step 5: gem5 Golden Reference Accuracy Comparison (`05_compare_gem5.sh`)](#step-5-gem5-golden-reference-accuracy-comparison-05_compare_gem5sh)
+- [Hardware Performance Counters & Diagnostics (`--all-perf`)](#hardware-performance-counters--diagnostics---all-perf)
+- [Microarchitecture Parameter Sweeps (`sweep_parameters.py`)](#microarchitecture-parameter-sweeps-sweep_parameterspy)
+- [Microarchitecture Configuration Presets](#microarchitecture-configuration-presets)
 - [Project Directory Structure](#project-directory-structure)
 - [License](#license)
 
@@ -49,8 +50,9 @@ TinyCpuSim provides an end-to-end simulation environment featuring an advanced T
   - Shared L2 Cache with LRU replacement policy and dirty write-back eviction.
   - MESI Cache Coherence state machine for multi-core simulation.
 
-- **Top-Down Microarchitecture Analysis (TMAM)**:
-  - Cycle-accurate Top-Down slot accounting (Frontend Bound, Bad Speculation, Backend Bound, Retiring).
+- **Comprehensive 40+ Hardware Performance Counters & TMAM**:
+  - Full execution port utilization, stall cycles, branch diagnostics, LSU forwarding rates, and cache/MSHR counters.
+  - Cycle-accurate Top-Down slot accounting (Level 1 & Level 2 breakdown).
   - Dynamic Region of Interest (ROI) statistics collection via `m5_reset_stats()` and `m5_dump_stats()`.
 
 ---
@@ -62,132 +64,215 @@ TinyCpuSim has minimal dependencies and runs seamlessly on macOS and Linux.
 - **Operating System**: macOS (Apple Silicon / Intel) or Linux (Ubuntu 20.04+, Debian, Fedora, Arch).
 - **C++ Compiler**: Clang (`clang++ >= 11` / Apple Clang 13+) or GCC (`g++ >= 9`) with C++17 support.
 - **Build System**: CMake `>= 3.15` and Make or Ninja.
-- **Python**: Python 3.8+ (used for gem5 accuracy regression and helper scripts).
-- *(Optional)* **Cross-Compiler**: `arm-none-eabi-gcc` (only needed if compiling new custom bare-metal ARM test fixtures).
+- **Python**: Python 3.8+ (used for parameter sweeps and gem5 regression).
 
 ---
 
-## Quickstart Guide
+## Quickstart Guide (1-Click Workflow)
 
-Get up and running in 3 simple commands:
+Anyone cloning the repository can immediately run the unified interactive menu or direct shortcuts:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Kuanwei1225/TinyCpuSim.git
+git clone git@github.com:Kuanwei1225/TinyCpuSim.git
 cd TinyCpuSim
 
-# 2. Build the project (Release mode)
-./scripts/build.sh
+# 2. Launch the interactive manager
+./run.sh
+```
 
-# 3. Run an Out-of-Order simulation on the Fibonacci benchmark
-./build/tinycpusim --uarch tests/fixtures/test_fibonacci.elf
+Or run direct shortcuts:
+```bash
+./run.sh build                  # [Step 1] Build simulator and all tests
+./run.sh test                   # [Step 2] Run 156+ unit & regression tests
+./run.sh ubench all             # [Step 3] Run isolated microbenchmarks
+./run.sh sim tests/fixtures/test_fibonacci.elf --all-perf   # [Step 4] Run full simulation
+./run.sh gem5 --all             # [Step 5] Compare against gem5 golden
+./run.sh sweep --param=rob_size # Run automated parameter sweep
 ```
 
 ---
 
-## Step-by-Step Usage & Commands
+## Sequential 5-Step Workflow Guide
 
-### 1. Building the Simulator
+For step-by-step sequential execution, simply follow the numbered scripts in order:
 
-#### Option A: Using the build script
+### Step 1: Building the Simulator (`01_build.sh`)
 ```bash
-./scripts/build.sh
+./scripts/01_build.sh
 ```
-
-#### Option B: Using CMake directly
-```bash
-mkdir -p build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-cd ..
-```
-
-The build produces the primary binary `./build/tinycpusim` (and a backward-compatible alias `./build/tinyarmsim`).
+Automatically detects system CPU cores, configures CMake Release mode, and builds the `tinycpusim` binary alongside all 156+ test executables.
 
 ---
 
-### 2. Running Out-of-Order (OoO) uArch Simulation
+### Step 2: Full Unit & Regression Tests (`02_run_tests.sh`)
+```bash
+./scripts/02_run_tests.sh
+```
+Executes all 156 unit and microarchitecture test cases with 100% pass guarantee.
 
-Run cycle-accurate superscalar simulation by passing the `--uarch` flag:
+---
+
+### Step 3: Component Microbenchmarks & Sweeps (`03_run_ubench.sh`)
+
+When developing, refactoring, or optimizing individual processor submodules, execute isolated microbenchmarks:
 
 ```bash
-# Basic run with default 4-wide OoO medium configuration
-./build/tinycpusim --uarch tests/fixtures/test_fibonacci.elf
+# Run all 35 microbenchmark cases
+./scripts/03_run_ubench.sh all
 
-# Run with custom microarchitecture config (e.g. wide 8-way core)
-./build/tinycpusim --uarch --uarch-config configs/ooo_wide.cfg tests/fixtures/test_fibonacci.elf
+# Test Branch Predictor & Frontend (12 tests)
+./scripts/03_run_ubench.sh bpu
 
-# Export performance metrics and Top-Down breakdown to a text file
-./build/tinycpusim --uarch --perf-log uarch_stats.txt tests/fixtures/test_fibonacci.elf
+# Test Execution Engine & LSU / Forwarding (12 tests)
+./scripts/03_run_ubench.sh exec
 
-# Using the helper runner script
-./scripts/run_uarch_sim.sh tests/fixtures/test_stress.elf configs/ooo_medium.cfg uarch_stats.txt
+# Test ROB & Top-Down Profiler (11 tests)
+./scripts/03_run_ubench.sh rob
+
+# Test Cache Hierarchy, MSHR & MESI Coherence (6 tests)
+./scripts/03_run_ubench.sh cache
+
+# Filter specific corner case
+./scripts/03_run_ubench.sh exec --gtest_filter=*ExactStoreToLoadForwarding*
 ```
 
-#### Example Output:
+---
+
+### Step 4: Full-System Simulation & Custom Configs (`04_run_simulation.sh`)
+
+Run bare-metal ARM ELF programs on the cycle-accurate Out-of-Order processor:
+
+```bash
+# Basic run with default OoO configuration (Medium)
+./scripts/04_run_simulation.sh tests/fixtures/test_fibonacci.elf
+
+# Run with full 40+ hardware performance counters displayed
+./scripts/04_run_simulation.sh tests/fixtures/test_fibonacci.elf --all-perf
+
+# Run with custom microarchitecture config (e.g. 8-wide core)
+./scripts/04_run_simulation.sh tests/fixtures/test_stress.elf configs/ooo_wide.cfg --all-perf
+
+# Run pure functional ISA simulation
+./scripts/04_run_simulation.sh tests/fixtures/test_arithmetic.elf --isa-only
+```
+> **Note**: Every simulation run automatically saves a full timestamped performance report to the `reports/` folder (e.g. `reports/test_fibonacci_20260926_214831.txt`).
+
+---
+
+### Step 5: gem5 Golden Reference Accuracy Comparison (`05_compare_gem5.sh`)
+
+Compare TinyCpuSim's execution statistics against the cycle-accurate **gem5** golden reference:
+
+```bash
+# Run batch regression across all 9 benchmark suites
+./scripts/05_compare_gem5.sh --all
+
+# Compare single benchmark
+./scripts/05_compare_gem5.sh --case=test_fibonacci
+```
+
+---
+
+## Hardware Performance Counters & Diagnostics (`--all-perf`)
+
+Running with `--all-perf` (or `-v`) outputs all 40+ hardware counters across all processor stages:
+
 ```text
 ============================================================
-              TinyCpuSim Performance Report                
+               TinyCpuSim uArch Simulation Report           
 ============================================================
-Simulated Total Cycles:     2132
-Total Committed Insts:      1708
-Aggregate Throughput (IPC): 0.801
-Branch Predictions:         171 (Accuracy: 95.91%)
-L1I Cache Accesses:         541 (Hit Rate: 99.45%)
-L1D Cache Accesses:         780 (Hit Rate: 98.85%)
-
---- Top-Down Microarchitecture Analysis (TMAM) ---
-  Frontend Bound:           18.42%
-  Bad Speculation:          4.12%
-  Backend Bound:            42.85%
-  Retiring:                 34.61%
+Simulated Target Clock:    1000.00 MHz
+Simulated Total Cycles:    2132 ticks
+Total Committed Insts:     1708
+Total Committed uOps:      3301
+Aggregate Throughput (IPC):0.801 inst/cycle (uOp IPC: 1.548)
+------------------------------------------------------------
+[ Core 0 Summary ]
+  Committed Insts / uOps:  1708 / 3301 (uOp Ratio: 1.93x)
+  Core Throughput (IPC):   0.801 inst/cycle
+  Branch Predictions:      911 (Accuracy: 74.2%)
+  Branch Mispredicts:      235 (Penalty Flushes: 235)
+  L1I Cache Hit Rate:      99.96% (5608/5610)
+  L1D Cache Hit Rate:      99.64% (1107/1111)
+  Loads / Stores:          634 / 531
+  Store-to-Load Forwards:  54 (Rate: 8.52%)
+  Mem Order Violations:    0
+  --- Top-Down Breakdown (Level 1) ---
+    Frontend Bound:        18.42%
+    Bad Speculation:       4.12%
+    Backend Bound:         42.85%
+    Retiring:              34.61%
+  --- Detailed Execution Ports ---
+    Port ALU uOps:         1465
+    Port MUL uOps:         0
+    Port DIV uOps:         0
+    Port Branch uOps:      700
+    Port LSU uOps:         1815
+  --- Pipeline Stalls Breakdown ---
+    ROB Full Stalls:       0 cycles
+    RS/IQ Full Stalls:     0 cycles
+    PRF Exhaustion Stalls: 0 cycles
+    LQ / SQ Full Stalls:   0 / 0 cycles
+    Head-of-ROB Stalls:    0 cycles
+  --- Branch Predictor Diagnostics ---
+    Direct Cond / Uncond:  321 / 0
+    Calls / Returns:       379 / 0
+    Indirect Branches:     0
+    BTB Hits / Misses:     589 / 322 (Hit Rate: 64.6%)
+    RAS Hits / Misses:     379 / 0 (Hit Rate: 100.0%)
+  --- LSU & Memory Disambiguation ---
+    Store-to-Load Forwards:54
+    Store Data Replays:    0
+    Memory Order Flushes:  0
+  --- Cache & MSHR Subsystem ---
+    L1I Misses / Evictions:2 / 0
+    L1D Misses / Evictions:4 / 0
+    L1D Dirty Writebacks:  0
+    L1D MSHR Allocations:  0 (Stalls: 0)
 ============================================================
 ```
 
 ---
 
-### 3. Running Pure Functional ISA Simulation
+## Microarchitecture Parameter Sweeps (`sweep_parameters.py`)
 
-Run fast bare-metal ISA emulation without microarchitectural timing:
+Explore the design space by sweeping hardware parameters across target programs:
 
 ```bash
-# Run functional simulation
-./build/tinycpusim tests/fixtures/test_arithmetic.elf
+# Sweep Reorder Buffer (ROB) size (16, 32, 64, 128, 256)
+python3 scripts/sweep_parameters.py --elf tests/fixtures/test_fibonacci.elf --param rob_size
 
-# Run with per-instruction cycle and register trace log
-./build/tinycpusim --log tests/fixtures/test_arithmetic.elf
+# Sweep Issue Width (1-way, 2-way, 4-way, 8-way)
+python3 scripts/sweep_parameters.py --elf tests/fixtures/test_stress.elf --param issue_width
 
-# Using the helper runner script
-./scripts/run_isa_sim.sh tests/fixtures/test_sort.elf
+# Sweep L1 Data Cache Size (8KB, 16KB, 32KB, 64KB)
+python3 scripts/sweep_parameters.py --elf tests/fixtures/test_mem_stride.elf --param l1d_size
+
+# Sweep Branch Predictor Algorithm (BIMODAL, GSHARE, TAGE)
+python3 scripts/sweep_parameters.py --elf tests/fixtures/test_branch_pred.elf --param bp_type
+```
+
+#### Example Sweep Output:
+```text
+===========================================================================
+  TinyCpuSim Parameter Sweep: [issue_width] on test_stress.elf
+  Base Config: ooo_medium.cfg
+===========================================================================
+Configuration      | Cycles     | IPC      | Branch Acc   | L1D Hit Rate
+---------------------------------------------------------------------------
+Width=1-way        | 130029     | 0.923    | 100.0%       | 100.0%      
+Width=2-way        | 80019      | 1.500    | 100.0%       | 100.0%      
+Width=4-way        | 80013      | 1.500    | 100.0%       | 100.0%      
+Width=8-way        | 80012      | 1.500    | 100.0%       | 100.0%      
+===========================================================================
 ```
 
 ---
 
-### 4. Top-Down Profiling & Dynamic ROI (m5ops)
+## Microarchitecture Configuration Presets
 
-TinyCpuSim supports dynamic Region-of-Interest (ROI) markers using standard `m5ops` assembly hooks (`0xEE 0x00 0x00 0x00`):
-- `m5_reset_stats()` (Opcode `0x40`): Resets cycle and instruction counters at the start of the target benchmark kernel.
-- `m5_dump_stats()` (Opcode `0x41`): Dumps current execution counters and Top-Down distribution at the end of the ROI.
-
-```c
-// Example C snippet for ROI instrumentation
-void benchmark_kernel() {
-    __asm__ volatile (".inst.w 0xee000040"); // m5_reset_stats: start ROI
-    
-    // Core compute loop
-    for (int i = 0; i < 1000; i++) {
-        compute();
-    }
-
-    __asm__ volatile (".inst.w 0xee000041"); // m5_dump_stats: end ROI
-}
-```
-
----
-
-### 5. Microarchitecture Configuration Presets
-
-Configuration files located in `configs/` allow fine-grained customization of core and memory parameters:
+Configuration files in `configs/` allow customization of core and cache hierarchy parameters:
 
 | Parameter | `ooo_narrow.cfg` | `ooo_medium.cfg` (Default) | `ooo_wide.cfg` |
 |:---|:---:|:---:|:---:|
@@ -201,140 +286,13 @@ Configuration files located in `configs/` allow fine-grained customization of co
 
 ---
 
-## Testing & Microbenchmarks
-
-TinyCpuSim features a two-tiered testing methodology:
-1. **Isolated Component Microbenchmarks (uBench)**: Fine-grained, cycle-by-cycle C++ unit tests to verify and stress individual submodules (BPU, PRF, Issue Queue, LSU, ROB, Caches) in isolation.
-2. **End-to-End Bare-Metal ELF Benchmarks**: Full-system simulations on compiled ARM bare-metal binaries compared against **gem5**.
-
----
-
-### Running All Tests
-To run the complete test suite (156+ unit tests & microbenchmarks):
-```bash
-./scripts/run_tests.sh
-```
-*(Or run `ctest --test-dir build --output-on-failure`)*
-
----
-
-### Running Component Microbenchmarks (uBench)
-
-For rapid iterative development and submodule replacement (e.g. swapping in a new branch predictor, implementing a new LSU forwarding network, or hooking an external RTL co-simulator), use `./scripts/run_ubench.sh`:
-
-```bash
-# 1. Run all isolated microbenchmarks
-./scripts/run_ubench.sh all
-
-# 2. Run Branch Prediction & Frontend microbenchmarks (12 tests)
-./scripts/run_ubench.sh bpu
-
-# 3. Run Execution Engine & LSU / Forwarding microbenchmarks (12 tests)
-./scripts/run_ubench.sh exec
-
-# 4. Run Reorder Buffer (ROB) & Top-Down Profiler microbenchmarks (11 tests)
-./scripts/run_ubench.sh rob
-
-# 5. Run Cache Hierarchy, MSHR & MESI Coherence microbenchmarks (6 tests)
-./scripts/run_ubench.sh cache
-
-# 6. Run a specific test case with GoogleTest filter
-./scripts/run_ubench.sh exec --gtest_filter=*ExactStoreToLoadForwarding*
-./scripts/run_ubench.sh bpu  --gtest_filter=*CorrelatedBranchesTAGE*
-./scripts/run_ubench.sh rob  --gtest_filter=*BottleneckParetoRanking*
-./scripts/run_ubench.sh cache --gtest_filter=*MesiCoherence*
-```
-
-### Component Microbenchmark Suites Breakdown:
-1. **Branch Prediction & Frontend (`bpu_frontend_ubench_test.cpp`)**:
-   - `BPU_UBench_TightLoopAlwaysTaken`: 2-bit saturating counter warmup & sustained loop prediction.
-   - `BPU_UBench_AlternatingPatternTNTN`: Periodic T-N-T-N branch pattern tracking.
-   - `BPU_UBench_DeepNestedCallReturnRAS`: 16-level deep call/return stack recovery.
-   - `BPU_UBench_IndirectCallTargetThrashing`: Dynamic indirect function pointer resolution.
-   - `BPU_UBench_CorrelatedBranchesTAGE`: Long history geometric correlation via TAGE tables.
-   - `BPU_UBench_BranchTargetBufferAliasStress`: BTB direct target caching and collision resilience.
-   - `Frontend_UBench_CrossCacheLineFetch`: 32-bit Thumb-2 instructions spanning 64B cache line boundaries.
-   - `Frontend_UBench_PrfExhaustionStall`: Zero-leakage stall & recovery under physical register starvation.
-   - `Frontend_UBench_FlagsRenamingWakeup`: Speculative CPSR/flags dependency rename & broadcast.
-   - `Frontend_UBench_MultiUopExpansionThroughput`: Multi-uOp macro-instruction expansions (e.g. `PUSH`/`POP`).
-   - `Frontend_UBench_SpeculativeCheckpointRestore`: Exact RAT rollback on branch mispredictions.
-   - `Frontend_UBench_DecoderIllegalOpcodeFault`: Undefined instruction decode fault trapping.
-
-2. **Execution & LSU (`exec_lsu_ubench_test.cpp`)**:
-   - `Exec_UBench_RawDependencyChainLatency`: Strict RAW latency serialization.
-   - `Exec_UBench_MulDivPipelinedLatency`: Pipelined multi-cycle integer arithmetic.
-   - `Exec_UBench_MaxIssueWidthSaturation`: Sustained N-wide superscalar throughput.
-   - `Exec_UBench_AgeOrderedContentionIssue`: Age-based issue priority under resource contention.
-   - `Exec_UBench_OutOfOrderConditionEvaluation`: Speculative condition code evaluation.
-   - `Exec_UBench_ExecutionPortContention`: Multi-port execution binding and arbitration.
-   - `LSU_UBench_ExactStoreToLoadForwarding`: 0-cycle store-queue to load bypass forwarding.
-   - `LSU_UBench_StoreDataPendingReplay`: Safe stall and replay when store data is unready.
-   - `LSU_UBench_MemoryOrderViolationDetection`: Store vs speculative load address collision squashing.
-   - `LSU_UBench_L1CacheHitVsMissLatency`: Accurate hit vs miss cycle penalty differential.
-   - `LSU_UBench_StridedAccessCacheThrashing`: Cache thrashing under non-contiguous strides.
-   - `LSU_UBench_LoadStoreQueueWrapAround`: Circular LSQ head/tail index wrap-around stress.
-
-3. **ROB & Top-Down Profiler (`rob_topdown_ubench_test.cpp`)**:
-   - `ROB_UBench_SustainedRetireThroughput`: Sustained maximum commit width.
-   - `ROB_UBench_HeadOfRobBlockingRetire`: In-order commit stalling on uncompleted head entry.
-   - `ROB_UBench_CircularBufferWrapAroundStress`: 1000+ instruction ROB index wraparound.
-   - `ROB_UBench_SpeculativeStoreDrainOnRetire`: Committed store buffer draining to memory.
-   - `ROB_UBench_MultipleBranchMispredictFlushes`: Consecutive branch squash and younger uop purge.
-   - `ROB_UBench_IsYoungerCircularAgeDistance`: High-precision circular age comparison.
-   - `TopDown_UBench_SlotConservationInvariant`: Mathematical slot conservation law (`Sum == Total Slots`).
-   - `TopDown_UBench_FrontendVsBackendBreakdown`: Quantitative stall slot classification.
-   - `TopDown_UBench_BadSpeculationAccounting`: Slot waste tracking during mispredicted execution paths.
-   - `ROB_UBench_RoiBoundaryResetStats`: Atomic stats reset at ROI boundary markers (`m5ops`).
-   - `TopDown_UBench_BottleneckParetoRanking`: Automatic identification of primary performance bottlenecks.
-
-4. **Cache & Coherence (`cache_ubench_test.cpp`)**:
-   - `Cache_UBench_L1HitLatencyAndThroughput`: Single-cycle L1 cache access timing.
-   - `Cache_UBench_LruReplacementSetAssociativity`: LRU set associativity replacement correctness.
-   - `Cache_UBench_WriteBackDirtyEviction`: Dirty line eviction and memory writeback.
-   - `Cache_UBench_MshrNonBlockingAllocation`: Non-blocking hit-under-miss via MSHR registers.
-   - `Cache_UBench_MesiCoherenceStateTransitions`: MESI protocol transitions (Modified/Exclusive/Shared/Invalid).
-   - `Cache_UBench_SharedL2HierarchicalInclusion`: Inclusive shared L2 cache behavior.
-
----
-
-## gem5 Golden Reference Accuracy Comparison
-
-TinyCpuSim is calibrated against the cycle-accurate **gem5** ARM simulator (O3CPU model). 
-
-To execute the automated accuracy regression across all golden benchmark suites:
-
-```bash
-python3 scripts/compare_with_gem5.py --all
-```
-
-To compare a single benchmark case:
-```bash
-python3 scripts/compare_with_gem5.py --case=test_fibonacci
-```
-
-### Macro-Instruction Retirement Precision:
-TinyCpuSim achieves **100% macro-instruction retirement precision** aligned with gem5:
-
-| Benchmark | TinyCpuSim Committed Insts | gem5 Golden Committed Insts | Instruction Delta |
-|:---|:---:|:---:|:---:|
-| `test_arithmetic` | 23 | 22 | +1 (Exit instruction) |
-| `test_branch_pred` | 1510 | 1509 | +1 (Exit instruction) |
-| `test_fibonacci` | 1708 | 1707 | +1 (Exit instruction) |
-| `test_isa_coverage` | 268 | 267 | +1 (Exit instruction) |
-| `test_mem_stride` | 257 | 256 | +1 (Exit instruction) |
-| `test_raw_hazard` | 608 | 607 | +1 (Exit instruction) |
-| `test_sort` | 148 | 147 | +1 (Exit instruction) |
-| `test_store_forward` | 19 | 18 | +1 (Exit instruction) |
-| `test_stress` | 120012 | 120011 | +1 (Exit instruction) |
-
----
-
 ## Project Directory Structure
 
 ```text
 TinyCpuSim/
 ├── CMakeLists.txt            # Main CMake build configuration
 ├── README.md                 # Complete documentation & usage guide
+├── run.sh                    # Top-level unified launcher & workflow manager
 ├── configs/                  # Microarchitecture configuration presets
 │   ├── ooo_narrow.cfg
 │   ├── ooo_medium.cfg
@@ -344,16 +302,19 @@ TinyCpuSim/
 │   ├── memory/               # Memory system, non-blocking caches, MESI coherence
 │   └── uarch/                # OoO pipeline: BPU, Frontend, PRF, Issue, Exec, LSU, ROB, TMAM
 ├── src/                      # Source implementations
-│   ├── main.cpp              # CLI driver with --uarch, --perf-log, and options
+│   ├── main.cpp              # CLI driver with --uarch, --all-perf, and options
 │   ├── isa/                  # ISA simulation & disassembler
 │   ├── memory/               # Memory bus & cache controller
 │   └── uarch/                # Cycle-accurate OoO pipeline stages
-├── scripts/                  # Helper automation scripts
-│   ├── build.sh              # 1-click build script
-│   ├── run_tests.sh          # Full test suite runner
-│   ├── run_uarch_sim.sh      # OoO uArch simulator runner
-│   ├── run_isa_sim.sh        # Functional ISA simulator runner
-│   └── compare_with_gem5.py  # gem5 golden comparison tool
+├── scripts/                  # Step-by-step workflow scripts
+│   ├── 01_build.sh           # Step 1: 1-click build script
+│   ├── 02_run_tests.sh       # Step 2: Full test suite runner (156 tests)
+│   ├── 03_run_ubench.sh      # Step 3: Component microbenchmark runner
+│   ├── 04_run_simulation.sh  # Step 4: Full-system simulation runner
+│   ├── 05_compare_gem5.sh    # Step 5: gem5 golden comparison tool
+│   ├── sweep_parameters.py   # Hardware parameter sweep utility
+│   └── compare_with_gem5.py  # gem5 accuracy comparator
+├── reports/                  # Automatically saved simulation performance logs
 └── tests/                    # Tests and benchmarks
     ├── fixtures/             # Bare-metal ELF binaries & assembly sources
     ├── golden/gem5/          # gem5 reference statistics logs

@@ -124,12 +124,47 @@ public:
         s.rs_full_stalls = rs_full_stalls_;
         s.rename_reg_exhaustion_stalls = rename_stalls_;
         s.branch_mispredict_flushes = branch_flushes_;
+        s.head_of_rob_stalls = head_of_rob_stalls_;
+        
+        s.port_alu_uops = port_alu_uops_;
+        s.port_mul_uops = port_mul_uops_;
+        s.port_div_uops = port_div_uops_;
+        s.port_branch_uops = port_branch_uops_;
+        s.port_lsu_uops = port_lsu_uops_;
+
         s.branch.predictions = branch_pred_count_;
         s.branch.mispredictions = branch_flushes_;
         s.branch.correct_predictions = (branch_pred_count_ >= branch_flushes_) ? (branch_pred_count_ - branch_flushes_) : 0;
+        s.branch.direct_cond = branch_direct_cond_;
+        s.branch.direct_uncond = branch_direct_uncond_;
+        s.branch.calls = branch_calls_;
+        s.branch.returns = branch_returns_;
+        s.branch.indirects = branch_indirects_;
+
         if (l1i_) s.l1i = l1i_->get_stats();
         if (l1d_) s.l1d = l1d_->get_stats();
         s.lsu = lsu_.get_stats();
+
+        if (profiler_) {
+            const auto& r = profiler_->get_report(core_id_);
+            s.topdown.total_slots = r.total_slots;
+            s.topdown.retiring_slots = r.retiring_slots;
+            s.topdown.bad_spec_slots = r.bad_spec_slots;
+            s.topdown.frontend_slots = r.frontend_slots;
+            s.topdown.backend_slots = r.backend_slots;
+            s.topdown.retiring_base_alu = r.retiring_base_alu;
+            s.topdown.retiring_mem = r.retiring_mem;
+            s.topdown.fe_l1i_miss = r.fe_l1i_miss;
+            s.topdown.fe_fetch_bubble = r.fe_fetch_bubble;
+            s.topdown.be_core_rs_full = r.be_core_rs_full;
+            s.topdown.be_core_rob_full = r.be_core_rob_full;
+            s.topdown.be_core_freelist_empty = r.be_core_freelist_empty;
+            s.topdown.be_mem_l1d_miss = r.be_mem_l1d_miss;
+            s.topdown.be_mem_mshr_full = r.be_mem_mshr_full;
+            s.topdown.be_mem_l2_miss = r.be_mem_l2_miss;
+            s.topdown.be_mem_store_buf_full = r.be_mem_store_buf_full;
+        }
+
         return s;
     }
 
@@ -365,8 +400,14 @@ private:
                 flag_n_ = n; flag_z_ = z; flag_c_ = c; flag_v_ = v;
             }
 
+            if (uop.type == UOpType::ALU) {
+                if (uop.opcode == Opcode::MUL || uop.opcode == Opcode::MLA) port_mul_uops_++;
+                else port_alu_uops_++;
+            }
+
             if (uop.type == UOpType::BRANCH || uop.type == UOpType::CALL || (uop.type == UOpType::RET && uop.opcode != Opcode::LDR)) {
                 branch_pred_count_++;
+                port_branch_uops_++;
                 bool actual_taken = false;
                 uint32_t actual_target = uop.actual_target;
 
@@ -409,6 +450,12 @@ private:
                 else if (uop.opcode == Opcode::BX) btype = BranchType::INDIRECT_BRANCH;
                 else if (uop.cond == ConditionCode::AL) btype = BranchType::DIRECT_UNCOND;
 
+                if (btype == BranchType::DIRECT_COND) branch_direct_cond_++;
+                else if (btype == BranchType::DIRECT_UNCOND) branch_direct_uncond_++;
+                else if (btype == BranchType::DIRECT_CALL || btype == BranchType::INDIRECT_CALL) branch_calls_++;
+                else if (btype == BranchType::RETURN) branch_returns_++;
+                else if (btype == BranchType::INDIRECT_BRANCH) branch_indirects_++;
+
                 // Update predictor in FetchUnit
                 fetch_unit_.get_branch_predictor().update(uop.pc, actual_taken, actual_target, btype, uop.branch_pred);
 
@@ -420,6 +467,7 @@ private:
                     mispredict_target = resolved_target;
                 }
             } else if (uop.type == UOpType::STORE_ADDR) {
+                port_lsu_uops_++;
                 uint32_t offset = uop.is_imm_valid ? static_cast<uint32_t>(uop.offset) : val2;
                 uop.mem_addr = val1 + offset;
                 size_t violating_rob = 0;
@@ -429,9 +477,11 @@ private:
                     violating_rob_idx = violating_rob;
                 }
             } else if (uop.type == UOpType::STORE_DATA) {
+                port_lsu_uops_++;
                 uop.mem_data = val1;
                 lsu_.execute_store_data(uop.lsu_queue_idx, uop.mem_data);
             } else if (uop.type == UOpType::LOAD || (uop.type == UOpType::RET && uop.opcode == Opcode::LDR)) {
+                port_lsu_uops_++;
                 uint32_t offset = uop.is_imm_valid ? static_cast<uint32_t>(uop.offset) : val2;
                 uop.mem_addr = val1 + offset;
                 auto l_res = lsu_.execute_load(uop.lsu_queue_idx, uop.mem_addr, uop.mem_size_bytes, uop.seq_num, uop.is_signed_mem);
@@ -774,6 +824,20 @@ private:
     uint64_t rename_stalls_{0};
     uint64_t branch_flushes_{0};
     uint64_t branch_pred_count_{0};
+    uint64_t head_of_rob_stalls_{0};
+
+    uint64_t port_alu_uops_{0};
+    uint64_t port_mul_uops_{0};
+    uint64_t port_div_uops_{0};
+    uint64_t port_branch_uops_{0};
+    uint64_t port_lsu_uops_{0};
+
+    uint64_t branch_direct_cond_{0};
+    uint64_t branch_direct_uncond_{0};
+    uint64_t branch_calls_{0};
+    uint64_t branch_returns_{0};
+    uint64_t branch_indirects_{0};
+
     bool halted_{false};
     bool debug_{false};
     TopDownProfiler* profiler_{nullptr};
