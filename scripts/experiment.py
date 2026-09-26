@@ -529,7 +529,8 @@ def main():
     )
     parser.add_argument("--elf", "-e", help="Target ELF binary name or comma-separated list (e.g. test_fibonacci.elf or test_fibonacci,test_sort)")
     parser.add_argument("--set", "-s", action="append", help="Override hardware parameter: --set <param>=<value>\n(e.g. --set rob=128 --set width=8 --set l1d_size=64KB --set bp=TAGE)")
-    parser.add_argument("--config", "-c", help="Path to custom baseline configuration file")
+    parser.add_argument("--config", "-c", help="Baseline configuration file or snapshot name in configs/save/ or configs/default/")
+    parser.add_argument("--base-report", "-br", help="Optional pre-existing baseline report text file to compare against (skips baseline simulation)")
     parser.add_argument("--list-params", "-lp", action="store_true", help="List all tunable microarchitecture parameters with descriptions")
     parser.add_argument("--list-elfs", "-le", action="store_true", help="List all available built-in test benchmark ELF files")
     parser.add_argument("--output", "-o", help="Optional report file path to save output")
@@ -552,12 +553,34 @@ def main():
     sim_bin = os.path.join(root_dir, "build", "tinycpusim")
     fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
     reports_dir = os.path.join(root_dir, "reports")
+    configs_dir = os.path.join(root_dir, "configs")
     os.makedirs(reports_dir, exist_ok=True)
 
-    default_base = os.path.join(root_dir, "configs", "default", "default.cfg")
-    if not os.path.exists(default_base):
-        default_base = os.path.join(root_dir, "configs", "current.cfg")
-    base_cfg = args.config if args.config else default_base
+    # Smart baseline config resolution
+    base_cfg = None
+    if args.config:
+        cfg_cand = args.config
+        if not cfg_cand.endswith('.cfg') and not os.path.exists(cfg_cand):
+            cfg_cand += '.cfg'
+        
+        search_paths = [
+            cfg_cand,
+            os.path.join(configs_dir, cfg_cand),
+            os.path.join(configs_dir, "save", cfg_cand),
+            os.path.join(configs_dir, "default", cfg_cand),
+        ]
+        for p in search_paths:
+            if os.path.exists(p):
+                base_cfg = p
+                break
+        if not base_cfg:
+            print(f"Error: Baseline config file not found for '{args.config}'. Checked: {search_paths}")
+            sys.exit(1)
+    else:
+        default_base = os.path.join(configs_dir, "default", "default.cfg")
+        if not os.path.exists(default_base):
+            default_base = os.path.join(configs_dir, "current.cfg")
+        base_cfg = default_base
 
     if not os.path.exists(sim_bin):
         print(f"Simulator binary not found. Running build first...")
@@ -622,8 +645,14 @@ def main():
 
     try:
         for elf_path in elf_targets:
-            # 1. Run Baseline
-            base_stats, _ = run_sim(sim_bin, elf_path, base_cfg)
+            # 1. Obtain Baseline Stats (from pre-existing report file or by simulating base_cfg)
+            if args.base_report and os.path.exists(args.base_report):
+                with open(args.base_report, 'r') as f_br:
+                    base_stats = parse_perf_output(f_br.read())
+                print(f"  Loaded pre-existing baseline report from: \033[1;36m{args.base_report}\033[0m")
+            else:
+                base_stats, _ = run_sim(sim_bin, elf_path, base_cfg)
+
             # 2. Run Experiment
             exp_stats, full_log = run_sim(sim_bin, elf_path, exp_cfg)
             # 3. Print Comparison
