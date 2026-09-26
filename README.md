@@ -252,17 +252,23 @@ Runs all 156 unit and regression tests with a 100% pass guarantee.
 
 ---
 
-### Step 3: Component Microbenchmarks (`03_run_ubench.sh`)
+### Step 3: Component Microbenchmarks & Performance Suite (`03_run_ubench.sh` / `run_ubench.py`)
 ```bash
-# Run all isolated component microbenchmarks
-./scripts/03_run_ubench.sh all
+# Launch interactive microbenchmark suite selector
+./run.sh ubench
 
-# Target specific subsystems
-./scripts/03_run_ubench.sh bpu     # Branch Predictor & Frontend
-./scripts/03_run_ubench.sh exec    # Execution Engine & LSU Forwarding
-./scripts/03_run_ubench.sh rob     # Reorder Buffer & Top-Down Profiler
-./scripts/03_run_ubench.sh cache   # Non-blocking Caches & MESI Coherence
+# Run specific component suites directly
+./run.sh ubench all     # Run all 41 microbenchmarks across full CPU
+./run.sh ubench bpu     # Branch Predictor & Frontend (TAGE, BTB, RAS, Fetch, PRF)
+./run.sh ubench exec    # Execution Engine & LSU (Issue width, Forwarding, Replay)
+./run.sh ubench rob     # Reorder Buffer & Top-Down (Retirement, Head blocking, TMAM)
+./run.sh ubench cache   # Non-blocking Caches (L1I/L1D hit latency, MSHRs, MESI)
 ```
+
+#### Key Capabilities:
+- **Baseline Tracking (`reports/ubench/default/`)**: Automatically compares active runs against baseline statistics with cycle deltas.
+- **Top Performers vs Bottlenecks**: Automatically ranks and isolates optimal subsystem efficiencies vs critical performance bottlenecks.
+- **Detailed Report Output (`reports/ubench/`)**: Saves full microarchitectural logs for every run into `reports/ubench/`.
 
 ---
 

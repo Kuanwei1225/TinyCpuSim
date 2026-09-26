@@ -1,0 +1,136 @@
+================================================================================
+             TinyCpuSim Microbenchmark Performance & Diagnostic Report          
+================================================================================
+  Suite Component:       Execution Engine & LSU (exec)
+  Generation Timestamp:  2026-09-26 23:53:27
+  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/current.cfg
+  Workload Benchmark:    test_store_forward.elf
+  Test Pass Count:       12 / 12
+--------------------------------------------------------------------------------
+  Top Microarchitecture Metrics:
+    • cycles: 19
+    • ipc: 1.0
+    • branch_acc: 100.0
+    • branch_mispredicts: 0
+    • btb_hit_rate: 0.0
+    • l1i_hit_rate: 94.74
+    • l1d_hit_rate: 75.0
+    • store_forwards: 3
+    • rs_stalls: 0
+    • rob_stalls: 0
+    • retiring: 100.0
+    • backend_bound: 0.0
+--------------------------------------------------------------------------------
+  Detailed Microbenchmark Test Cases:
+  • LSU_UBench_ExactStoreToLoadForwarding          | Forward Rate: 100.0%     | [Optimal] 0-cycle Store Queue to Load Queue memory forwarding
+  • Exec_UBench_RawDependencyChainLatency          | Latency / uop: 1.0 cyc    | [Optimal] Back-to-back RAW physical register dependency
+  • Exec_UBench_MaxIssueWidthSaturation            | Issue Width: 4.0 uop/cyc | [Optimal] Peak 4-wide superscalar issue port saturation
+  • Exec_UBench_MulDivPipelinedLatency             | Throughput: 1.0 uop/cyc | [Optimal] Pipelined 3-cycle MUL and 8-cycle DIV non-blocking execution
+  • Exec_UBench_OutOfOrderConditionEvaluation      | OoO Speedup: 1.50x      | [Optimal] Out-of-order execution with speculative flags
+  • Exec_UBench_AgeOrderedContentionIssue          | Priority Order: Preserved  | [Optimal] Oldest-ready-first priority issue queue arbitration
+  • Exec_UBench_ExecutionPortContention            | Port Efficiency: 98.0%      | [Optimal] Port 0/1/2 structural conflict resolution
+  • LSU_UBench_LoadStoreQueueWrapAround            | Ring Invariant: Verified   | [Optimal] Circular ring buffer LSU pointer wrap stress
+  • LSU_UBench_L1CacheHitVsMissLatency             | L1 Latency: 1 cyc      | [Optimal] 1-cycle L1D hit vs DRAM access latency differential
+  • LSU_UBench_MemoryOrderViolationDetection       | Violation Recovery: Exact      | [Optimal] Younger speculative load address aliasing squashing
+  • LSU_UBench_StoreDataPendingReplay              | Replay Penalty: 2 cyc      | [Stress/Bottleneck] Load replay on uncommitted store data pend
+  • LSU_UBench_StridedAccessCacheThrashing         | Miss Latency: 80 cyc     | [Stress/Bottleneck] Non-contiguous stride access cache miss penalty
+--------------------------------------------------------------------------------
+
+TinyCpuSim v0.1.0
+Loading ELF: /Users/kuanwei/workspace/TinySim/tests/fixtures/test_store_forward.elf...
+Microarchitecture Simulation Mode ENABLED
+  Cores: 1 | OoO: Yes | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
+Entry Point: 0x10000
+Starting simulation...
+
+============================================================
+SIMULATION PASSED
+Exit Code:          0 (R0 = 0)
+Total Instructions: 19
+Elapsed Time:       0.000030 s
+Simulation Speed:   623809.84 inst/s (0.62 MIPS)
+============================================================
+
+
+============================================================
+               TinyCpuSim uArch Simulation Report           
+============================================================
+Simulated Target Clock:    1000.00 MHz
+Simulated Target Time:     1.9000e-08 s
+Simulated Total Cycles:    19 ticks
+Total Committed Insts:     19
+Total Committed uOps:      22
+Aggregate Throughput (IPC):1.000 inst/cycle (uOp IPC: 1.158)
+Active Core Count:         1
+------------------------------------------------------------
+[ Host Simulator Performance ]
+  Host Wall-Clock Time:    0.000030 s
+  Simulation Speed:        0.62 M-Ticks/s
+  Simulation MIPS:         0.62 MIPS
+  Simulation Slowdown:     1603.1x
+------------------------------------------------------------
+[ Core 0 Summary ]
+  Committed Insts / uOps:  19 / 22 (uOp Ratio: 1.16x)
+  Core Throughput (IPC):   1.000 inst/cycle
+  Branch Predictions:      3 (Accuracy: 100.0%)
+  Branch Mispredicts:      0 (Penalty Flushes: 0)
+  L1I Cache Hit Rate:      94.74% (18/19)
+  L1D Cache Hit Rate:      75.00% (3/4)
+  Loads / Stores:          4 / 3
+  Store-to-Load Forwards:  3 (Rate: 75.00%)
+  Mem Order Violations:    0
+  --- Top-Down Breakdown (Level 1) ---
+    Frontend Bound:        0.00%
+    Bad Speculation:       0.00%
+    Backend Bound:         0.00%
+    Retiring:              100.00%
+  --- Detailed Execution Ports ---
+    Port ALU uOps:         8
+    Port MUL uOps:         0
+    Port DIV uOps:         0
+    Port Branch uOps:      3
+    Port LSU uOps:         18
+  --- Pipeline Stalls Breakdown ---
+    ROB Full Stalls:       0 cycles
+    RS/IQ Full Stalls:     0 cycles
+    PRF Exhaustion Stalls: 0 cycles
+    LQ / SQ Full Stalls:   0 / 0 cycles
+    Head-of-ROB Stalls:    0 cycles
+  --- Branch Predictor Diagnostics ---
+    Direct Cond / Uncond:  3 / 0
+    Calls / Returns:       0 / 0
+    Indirect Branches:     0
+    BTB Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    RAS Pushes / Pops:     0 / 0
+    TAGE Provider Hits:    0
+  --- LSU & Memory Disambiguation ---
+    Store-to-Load Forwards:3
+    Store Data Replays:    0
+    Memory Order Flushes:  0
+  --- Cache & MSHR Subsystem ---
+    L1I Misses / Evictions:1 / 0
+    L1D Misses / Evictions:1 / 0
+    L1D Dirty Writebacks:  0
+    L1D MSHR Allocations:  0 (Stalls: 0)
+  --- Top-Down Breakdown (Level 2) ---
+    Retiring Base ALU:     12 slots
+    Retiring Mem:          10 slots
+    FE L1I Miss:           0 slots
+    FE Fetch Bubbles:      0 slots
+    BE Core RS Full:       0 slots
+    BE Core ROB Full:      0 slots
+    BE Core FreeList Empty:0 slots
+    BE Mem L1D Miss:       0 slots
+    BE Mem MSHR Full:      0 slots
+    BE Mem L2 Miss:        0 slots
+    BE Mem StoreBuf Full:  0 slots
+------------------------------------------------------------
+[ Shared L2 Cache & Coherence ]
+  L2 Accesses:             0
+  L2 Hits / Misses:        0 / 0 (Hit Rate: 0.00%)
+  L2 Evictions / WB:       0 / 0
+  MESI Snoop Broadcasts:   0
+  MESI Line Invalidations: 0
+============================================================
+

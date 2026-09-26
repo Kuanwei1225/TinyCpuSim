@@ -65,7 +65,7 @@ show_menu() {
         c|C|config) python3 "${PROJECT_ROOT}/scripts/config.py" ;;
         1) "${PROJECT_ROOT}/scripts/01_build.sh" ;;
         2) "${PROJECT_ROOT}/scripts/02_run_tests.sh" ;;
-        3) "${PROJECT_ROOT}/scripts/03_run_ubench.sh" all ;;
+        3) "${PROJECT_ROOT}/scripts/03_run_ubench.sh" ;;
         4) "${PROJECT_ROOT}/scripts/04_run_simulation.sh" ;;
         5) "${PROJECT_ROOT}/scripts/05_compare_gem5.sh" --all ;;
         6) run_interactive_exp ;;
