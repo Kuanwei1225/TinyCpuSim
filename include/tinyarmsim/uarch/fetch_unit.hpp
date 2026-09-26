@@ -48,8 +48,8 @@ public:
                 break;
             }
 
-            // Access L1I cache if enabled
-            if (l1i_ && l1i_->get_config().enabled) {
+            // Access L1I cache if active
+            if (l1i_ && l1i_->get_config().is_active()) {
                 uint32_t lat = 0;
                 l1i_->access(pc_, false, lat);
             }

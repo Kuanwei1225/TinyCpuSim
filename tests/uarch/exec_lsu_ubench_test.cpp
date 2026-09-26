@@ -215,7 +215,6 @@ TEST(ExecLsuUBenchTest, Exec_UBench_ExecutionPortContention) {
 TEST(ExecLsuUBenchTest, LSU_UBench_ExactStoreToLoadForwarding) {
     MemoryBus bus(4096);
     LsuConfig cfg;
-    cfg.enable_store_forwarding = true;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
     // Older Store (seq=1, addr=0x2000, data=0xCAFEBABE)
@@ -241,7 +240,6 @@ TEST(ExecLsuUBenchTest, LSU_UBench_ExactStoreToLoadForwarding) {
 TEST(ExecLsuUBenchTest, LSU_UBench_StoreDataPendingReplay) {
     MemoryBus bus(4096);
     LsuConfig cfg;
-    cfg.enable_store_forwarding = true;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
     // Older Store (seq=10, addr=0x3000, data NOT yet valid)
@@ -274,7 +272,6 @@ TEST(ExecLsuUBenchTest, LSU_UBench_MemoryOrderViolationDetection) {
     bus.write32(0x1000, 0x11111111); // Initial value in memory
 
     LsuConfig cfg;
-    cfg.enable_store_forwarding = true;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
     // Older Store (seq=20, rob=10) - address not yet known
@@ -303,7 +300,6 @@ TEST(ExecLsuUBenchTest, LSU_UBench_L1CacheHitVsMissLatency) {
     bus.write32(0x4000, 0x87654321);
 
     CacheConfig l1_cfg;
-    l1_cfg.enabled = true;
     l1_cfg.size_bytes = 1024;
     l1_cfg.line_size = 64;
     l1_cfg.associativity = 4;
@@ -333,7 +329,6 @@ TEST(ExecLsuUBenchTest, LSU_UBench_L1CacheHitVsMissLatency) {
 TEST(ExecLsuUBenchTest, LSU_UBench_StridedAccessCacheThrashing) {
     MemoryBus bus(65536);
     CacheConfig l1_cfg;
-    l1_cfg.enabled = true;
     l1_cfg.size_bytes = 512;
     l1_cfg.line_size = 64;
     l1_cfg.associativity = 2;

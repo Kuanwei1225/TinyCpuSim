@@ -9,6 +9,12 @@
 
 namespace tinyarmsim::uarch {
 
+enum class CoreType {
+    OOO_TOMASULO,
+    SIMPLE_INORDER,
+    FAST_FEEDER
+};
+
 enum class ReplacementPolicy {
     LRU,
     FIFO,
@@ -21,14 +27,33 @@ enum class WritePolicy {
 };
 
 enum class PredictorType {
+    NONE,
     IDEAL,
     BIMODAL,
     GSHARE,
     TAGE
 };
 
+enum class LsuType {
+    SPECULATIVE_OOO,
+    STRICT_INORDER,
+    PASSTHROUGH
+};
+
+enum class CacheType {
+    SET_ASSOCIATIVE,
+    DIRECT_MAPPED,
+    ZERO_LATENCY,
+    PASSTHROUGH
+};
+
+enum class CoherenceProtocol {
+    NONE,
+    MESI
+};
+
 struct CacheConfig {
-    bool enabled{true};
+    CacheType type{CacheType::SET_ASSOCIATIVE};
     size_t size_bytes{32768};        // Default: 32KB
     size_t line_size{64};            // Default: 64B
     size_t associativity{4};         // Default: 4-way
@@ -37,13 +62,24 @@ struct CacheConfig {
     WritePolicy write_policy{WritePolicy::WRITE_BACK};
     size_t mshr_entries{8};          // Non-blocking MSHR capacity
 
+    [[nodiscard]] bool is_active() const noexcept {
+        return type != CacheType::PASSTHROUGH;
+    }
+
+    [[nodiscard]] bool is_zero_latency() const noexcept {
+        return type == CacheType::ZERO_LATENCY;
+    }
+
     [[nodiscard]] size_t num_sets() const noexcept {
         if (line_size == 0 || associativity == 0) return 0;
         return size_bytes / (line_size * associativity);
     }
 
     void validate() const {
-        if (!enabled) return;
+        if (!is_active()) return;
+        if (type == CacheType::DIRECT_MAPPED && associativity != 1) {
+            throw std::invalid_argument("DIRECT_MAPPED cache must have associativity = 1");
+        }
         if (size_bytes == 0 || (size_bytes & (size_bytes - 1)) != 0) {
             throw std::invalid_argument("Cache size_bytes must be a non-zero power of 2");
         }
@@ -60,15 +96,22 @@ struct CacheConfig {
 };
 
 struct BranchPredictorConfig {
-    bool enabled{true};
     PredictorType type{PredictorType::TAGE};
     size_t table_size{4096};
     size_t btb_size{4096};
     size_t ras_size{32};
     size_t tage_tables{4};
 
+    [[nodiscard]] bool is_active() const noexcept {
+        return type != PredictorType::NONE;
+    }
+
+    [[nodiscard]] bool is_ideal() const noexcept {
+        return type == PredictorType::IDEAL;
+    }
+
     void validate() const {
-        if (!enabled) return;
+        if (!is_active() || is_ideal()) return;
         if (table_size == 0 || (table_size & (table_size - 1)) != 0) {
             throw std::invalid_argument("Predictor table_size must be a power of 2");
         }
@@ -79,17 +122,23 @@ struct BranchPredictorConfig {
 };
 
 struct LsuConfig {
-    bool enabled{true};
+    LsuType type{LsuType::SPECULATIVE_OOO};
     size_t lq_size{16};
     size_t sq_size{16};
-    bool enable_speculative_load{true};
-    bool enable_store_forwarding{true};
     uint32_t store_forward_latency{1};
     uint32_t num_load_ports{2};
     uint32_t num_store_ports{1};
 
+    [[nodiscard]] bool is_active() const noexcept {
+        return type != LsuType::PASSTHROUGH;
+    }
+
+    [[nodiscard]] bool is_speculative() const noexcept {
+        return type == LsuType::SPECULATIVE_OOO;
+    }
+
     void validate() const {
-        if (!enabled) return;
+        if (!is_active()) return;
         if (lq_size == 0 || sq_size == 0) {
             throw std::invalid_argument("LQ and SQ sizes must be > 0");
         }
@@ -97,7 +146,7 @@ struct LsuConfig {
 };
 
 struct CoreConfig {
-    bool enable_ooo{true};
+    CoreType type{CoreType::OOO_TOMASULO};
     uint32_t fetch_width{4};
     uint32_t decode_width{4};
     uint32_t rename_width{4};
@@ -112,12 +161,24 @@ struct CoreConfig {
     BranchPredictorConfig branch_predictor{};
     LsuConfig lsu{};
 
+    [[nodiscard]] bool is_ooo() const noexcept {
+        return type == CoreType::OOO_TOMASULO;
+    }
+
+    [[nodiscard]] bool is_fast_feeder() const noexcept {
+        return type == CoreType::FAST_FEEDER;
+    }
+
+    [[nodiscard]] bool is_simple_inorder() const noexcept {
+        return type == CoreType::SIMPLE_INORDER;
+    }
+
     void validate() const {
         if (fetch_width == 0 || decode_width == 0 || rename_width == 0 ||
             issue_width == 0 || commit_width == 0) {
             throw std::invalid_argument("Pipeline stage widths must be > 0");
         }
-        if (enable_ooo) {
+        if (is_ooo()) {
             if (rob_size == 0 || rs_size == 0) {
                 throw std::invalid_argument("ROB and RS sizes must be > 0 when OoO is enabled");
             }
@@ -137,7 +198,7 @@ struct UArchConfig {
     CoreConfig default_core{};
     std::vector<CoreConfig> cores{};
     CacheConfig l2_shared{
-        true,
+        CacheType::SET_ASSOCIATIVE,
         524288,   // 512KB
         64,       // 64B line
         8,        // 8-way
@@ -146,8 +207,12 @@ struct UArchConfig {
         WritePolicy::WRITE_BACK,
         16        // 16 MSHR entries
     };
-    bool enable_mesi_coherence{true};
+    CoherenceProtocol coherence{CoherenceProtocol::MESI};
     uint32_t dram_latency_cycles{80};
+
+    [[nodiscard]] bool is_mesi_enabled() const noexcept {
+        return coherence == CoherenceProtocol::MESI;
+    }
 
     [[nodiscard]] const CoreConfig& get_core_config(size_t core_id) const noexcept {
         if (core_id < cores.size()) {
@@ -170,7 +235,7 @@ struct UArchConfig {
     static UArchConfig make_in_order_simple() {
         UArchConfig cfg;
         cfg.num_cores = 1;
-        cfg.default_core.enable_ooo = false;
+        cfg.default_core.type = CoreType::SIMPLE_INORDER;
         cfg.default_core.fetch_width = 1;
         cfg.default_core.decode_width = 1;
         cfg.default_core.rename_width = 1;
@@ -179,11 +244,11 @@ struct UArchConfig {
         cfg.default_core.rob_size = 1;
         cfg.default_core.rs_size = 1;
         cfg.default_core.branch_predictor.type = PredictorType::BIMODAL;
-        cfg.default_core.lsu.enabled = false;
-        cfg.default_core.l1i.enabled = false;
-        cfg.default_core.l1d.enabled = false;
-        cfg.l2_shared.enabled = false;
-        cfg.enable_mesi_coherence = false;
+        cfg.default_core.lsu.type = LsuType::PASSTHROUGH;
+        cfg.default_core.l1i.type = CacheType::PASSTHROUGH;
+        cfg.default_core.l1d.type = CacheType::PASSTHROUGH;
+        cfg.l2_shared.type = CacheType::PASSTHROUGH;
+        cfg.coherence = CoherenceProtocol::NONE;
         return cfg;
     }
 
@@ -199,6 +264,20 @@ struct UArchConfig {
         cfg.num_cores = cores;
         cfg.cores.resize(cores, cfg.default_core);
         cfg.l2_shared.size_bytes = 1024 * 1024 * 2; // 2MB
+        cfg.coherence = CoherenceProtocol::MESI;
+        cfg.validate();
+        return cfg;
+    }
+
+    static UArchConfig make_fast_feeder_mem() {
+        UArchConfig cfg;
+        cfg.num_cores = 1;
+        cfg.default_core.type = CoreType::FAST_FEEDER;
+        cfg.default_core.branch_predictor.type = PredictorType::IDEAL;
+        cfg.default_core.lsu.type = LsuType::PASSTHROUGH;
+        cfg.default_core.l1i.type = CacheType::SET_ASSOCIATIVE;
+        cfg.default_core.l1d.type = CacheType::SET_ASSOCIATIVE;
+        cfg.l2_shared.type = CacheType::SET_ASSOCIATIVE;
         cfg.validate();
         return cfg;
     }
@@ -243,16 +322,53 @@ struct UArchConfig {
             trim_str(key);
             trim_str(val);
 
+            auto to_upper = [](std::string s) {
+                std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+                return s;
+            };
+
             auto parse_bool = [](const std::string& v) -> bool {
                 return (v == "1" || v == "true" || v == "TRUE" || v == "yes" || v == "True");
             };
 
+            std::string u_val = to_upper(val);
+
+            auto parse_cache_field = [&](CacheConfig& c) {
+                if (key == "type") {
+                    if (u_val == "SET_ASSOCIATIVE" || u_val == "DEFAULT") c.type = CacheType::SET_ASSOCIATIVE;
+                    else if (u_val == "DIRECT_MAPPED") { c.type = CacheType::DIRECT_MAPPED; c.associativity = 1; }
+                    else if (u_val == "ZERO_LATENCY" || u_val == "IDEAL") c.type = CacheType::ZERO_LATENCY;
+                    else if (u_val == "PASSTHROUGH" || u_val == "NONE" || u_val == "BYPASS") c.type = CacheType::PASSTHROUGH;
+                }
+                else if (key == "enabled") {
+                    c.type = parse_bool(val) ? CacheType::SET_ASSOCIATIVE : CacheType::PASSTHROUGH;
+                }
+                else if (key == "size_bytes" || key == "size") c.size_bytes = std::stoul(val);
+                else if (key == "line_size") c.line_size = std::stoul(val);
+                else if (key == "associativity" || key == "assoc") c.associativity = std::stoul(val);
+                else if (key == "hit_latency" || key == "hit_latency_cycles") c.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
+                else if (key == "mshr_entries") c.mshr_entries = std::stoul(val);
+            };
+
             if (current_section == "global" || current_section == "system") {
                 if (key == "num_cores") cfg.num_cores = std::stoul(val);
-                else if (key == "enable_mesi" || key == "enable_mesi_coherence") cfg.enable_mesi_coherence = parse_bool(val);
+                else if (key == "coherence" || key == "coherence_protocol") {
+                    if (u_val == "MESI") cfg.coherence = CoherenceProtocol::MESI;
+                    else if (u_val == "NONE" || u_val == "DISABLED") cfg.coherence = CoherenceProtocol::NONE;
+                }
+                else if (key == "enable_mesi" || key == "enable_mesi_coherence") {
+                    cfg.coherence = parse_bool(val) ? CoherenceProtocol::MESI : CoherenceProtocol::NONE;
+                }
                 else if (key == "dram_latency" || key == "dram_latency_cycles") cfg.dram_latency_cycles = static_cast<uint32_t>(std::stoul(val));
             } else if (current_section == "core") {
-                if (key == "enable_ooo" || key == "ooo") cfg.default_core.enable_ooo = parse_bool(val);
+                if (key == "type" || key == "mode") {
+                    if (u_val == "OOO_TOMASULO" || u_val == "OOO") cfg.default_core.type = CoreType::OOO_TOMASULO;
+                    else if (u_val == "SIMPLE_INORDER" || u_val == "INORDER" || u_val == "IN_ORDER") cfg.default_core.type = CoreType::SIMPLE_INORDER;
+                    else if (u_val == "FAST_FEEDER" || u_val == "FEEDER" || u_val == "BYPASS") cfg.default_core.type = CoreType::FAST_FEEDER;
+                }
+                else if (key == "enable_ooo" || key == "ooo") {
+                    cfg.default_core.type = parse_bool(val) ? CoreType::OOO_TOMASULO : CoreType::SIMPLE_INORDER;
+                }
                 else if (key == "fetch_width") cfg.default_core.fetch_width = static_cast<uint32_t>(std::stoul(val));
                 else if (key == "decode_width") cfg.default_core.decode_width = static_cast<uint32_t>(std::stoul(val));
                 else if (key == "rename_width") cfg.default_core.rename_width = static_cast<uint32_t>(std::stoul(val));
@@ -262,43 +378,37 @@ struct UArchConfig {
                 else if (key == "rs_size" || key == "rs" || key == "iq_size") cfg.default_core.rs_size = std::stoul(val);
                 else if (key == "num_phys_regs" || key == "prf") cfg.default_core.num_phys_regs = std::stoul(val);
             } else if (current_section == "l1i" || current_section == "cache_l1i") {
-                if (key == "enabled") cfg.default_core.l1i.enabled = parse_bool(val);
-                else if (key == "size_bytes" || key == "size") cfg.default_core.l1i.size_bytes = std::stoul(val);
-                else if (key == "line_size") cfg.default_core.l1i.line_size = std::stoul(val);
-                else if (key == "associativity" || key == "assoc") cfg.default_core.l1i.associativity = std::stoul(val);
-                else if (key == "hit_latency" || key == "hit_latency_cycles") cfg.default_core.l1i.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
-                else if (key == "mshr_entries") cfg.default_core.l1i.mshr_entries = std::stoul(val);
+                parse_cache_field(cfg.default_core.l1i);
             } else if (current_section == "l1d" || current_section == "cache_l1d") {
-                if (key == "enabled") cfg.default_core.l1d.enabled = parse_bool(val);
-                else if (key == "size_bytes" || key == "size") cfg.default_core.l1d.size_bytes = std::stoul(val);
-                else if (key == "line_size") cfg.default_core.l1d.line_size = std::stoul(val);
-                else if (key == "associativity" || key == "assoc") cfg.default_core.l1d.associativity = std::stoul(val);
-                else if (key == "hit_latency" || key == "hit_latency_cycles") cfg.default_core.l1d.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
-                else if (key == "mshr_entries") cfg.default_core.l1d.mshr_entries = std::stoul(val);
+                parse_cache_field(cfg.default_core.l1d);
             } else if (current_section == "l2" || current_section == "cache_l2") {
-                if (key == "enabled") cfg.l2_shared.enabled = parse_bool(val);
-                else if (key == "size_bytes" || key == "size") cfg.l2_shared.size_bytes = std::stoul(val);
-                else if (key == "line_size") cfg.l2_shared.line_size = std::stoul(val);
-                else if (key == "associativity" || key == "assoc") cfg.l2_shared.associativity = std::stoul(val);
-                else if (key == "hit_latency" || key == "hit_latency_cycles") cfg.l2_shared.hit_latency_cycles = static_cast<uint32_t>(std::stoul(val));
-                else if (key == "mshr_entries") cfg.l2_shared.mshr_entries = std::stoul(val);
+                parse_cache_field(cfg.l2_shared);
             } else if (current_section == "branch_predictor") {
-                if (key == "enabled") cfg.default_core.branch_predictor.enabled = parse_bool(val);
-                else if (key == "type") {
-                    if (val == "IDEAL" || val == "ideal") cfg.default_core.branch_predictor.type = PredictorType::IDEAL;
-                    else if (val == "BIMODAL" || val == "bimodal") cfg.default_core.branch_predictor.type = PredictorType::BIMODAL;
-                    else if (val == "GSHARE" || val == "gshare") cfg.default_core.branch_predictor.type = PredictorType::GSHARE;
-                    else if (val == "TAGE" || val == "tage") cfg.default_core.branch_predictor.type = PredictorType::TAGE;
-                } else if (key == "table_size") cfg.default_core.branch_predictor.table_size = std::stoul(val);
+                if (key == "type") {
+                    if (u_val == "IDEAL" || u_val == "BYPASS") cfg.default_core.branch_predictor.type = PredictorType::IDEAL;
+                    else if (u_val == "NONE" || u_val == "DISABLED") cfg.default_core.branch_predictor.type = PredictorType::NONE;
+                    else if (u_val == "BIMODAL") cfg.default_core.branch_predictor.type = PredictorType::BIMODAL;
+                    else if (u_val == "GSHARE") cfg.default_core.branch_predictor.type = PredictorType::GSHARE;
+                    else if (u_val == "TAGE") cfg.default_core.branch_predictor.type = PredictorType::TAGE;
+                }
+                else if (key == "enabled") {
+                    if (!parse_bool(val)) cfg.default_core.branch_predictor.type = PredictorType::NONE;
+                }
+                else if (key == "table_size") cfg.default_core.branch_predictor.table_size = std::stoul(val);
                 else if (key == "btb_size") cfg.default_core.branch_predictor.btb_size = std::stoul(val);
                 else if (key == "ras_size") cfg.default_core.branch_predictor.ras_size = std::stoul(val);
                 else if (key == "tage_tables") cfg.default_core.branch_predictor.tage_tables = std::stoul(val);
             } else if (current_section == "lsu") {
-                if (key == "enabled") cfg.default_core.lsu.enabled = parse_bool(val);
+                if (key == "type") {
+                    if (u_val == "SPECULATIVE_OOO" || u_val == "OOO" || u_val == "SPECULATIVE") cfg.default_core.lsu.type = LsuType::SPECULATIVE_OOO;
+                    else if (u_val == "STRICT_INORDER" || u_val == "INORDER") cfg.default_core.lsu.type = LsuType::STRICT_INORDER;
+                    else if (u_val == "PASSTHROUGH" || u_val == "NONE" || u_val == "BYPASS") cfg.default_core.lsu.type = LsuType::PASSTHROUGH;
+                }
+                else if (key == "enabled") {
+                    if (!parse_bool(val)) cfg.default_core.lsu.type = LsuType::PASSTHROUGH;
+                }
                 else if (key == "lq_size") cfg.default_core.lsu.lq_size = std::stoul(val);
                 else if (key == "sq_size") cfg.default_core.lsu.sq_size = std::stoul(val);
-                else if (key == "enable_forwarding" || key == "enable_store_forwarding") cfg.default_core.lsu.enable_store_forwarding = parse_bool(val);
-                else if (key == "enable_speculative_load") cfg.default_core.lsu.enable_speculative_load = parse_bool(val);
                 else if (key == "store_forward_latency") cfg.default_core.lsu.store_forward_latency = static_cast<uint32_t>(std::stoul(val));
             }
         }

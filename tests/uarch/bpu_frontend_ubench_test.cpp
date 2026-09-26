@@ -16,7 +16,6 @@ using namespace tinyarmsim::uarch;
 // 1. Tight loop always taken branch prediction saturation and steady-state accuracy
 TEST(BpuFrontendUBenchTest, BPU_UBench_TightLoopAlwaysTaken) {
     BranchPredictorConfig cfg;
-    cfg.enabled = true;
     cfg.type = PredictorType::GSHARE;
     cfg.table_size = 1024;
     cfg.btb_size = 512;
@@ -45,7 +44,6 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_TightLoopAlwaysTaken) {
 // 2. Alternating (TNTN) pattern to test GShare global history correlation
 TEST(BpuFrontendUBenchTest, BPU_UBench_AlternatingPatternTNTN) {
     BranchPredictorConfig cfg;
-    cfg.enabled = true;
     cfg.type = PredictorType::GSHARE;
     cfg.table_size = 2048;
     cfg.btb_size = 512;
@@ -107,7 +105,6 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_DeepNestedCallReturnRAS) {
 // 4. Polymorphic indirect branch target switching stress on BTB
 TEST(BpuFrontendUBenchTest, BPU_UBench_IndirectCallTargetThrashing) {
     BranchPredictorConfig cfg;
-    cfg.enabled = true;
     cfg.type = PredictorType::BIMODAL;
     cfg.btb_size = 512;
     CompositeBranchPredictor bpu(cfg);
@@ -138,7 +135,6 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_IndirectCallTargetThrashing) {
 // 5. Correlated branch patterns on TAGE multi-table geometric history
 TEST(BpuFrontendUBenchTest, BPU_UBench_CorrelatedBranchesTAGE) {
     BranchPredictorConfig cfg;
-    cfg.enabled = true;
     cfg.type = PredictorType::TAGE;
     cfg.tage_tables = 4;
     cfg.btb_size = 512;
@@ -177,7 +173,6 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_CorrelatedBranchesTAGE) {
 // 6. BTB hash index aliasing stress
 TEST(BpuFrontendUBenchTest, BPU_UBench_BranchTargetBufferAliasStress) {
     BranchPredictorConfig cfg;
-    cfg.enabled = true;
     cfg.type = PredictorType::GSHARE;
     cfg.btb_size = 128;
     CompositeBranchPredictor bpu(cfg);
@@ -215,7 +210,7 @@ TEST(BpuFrontendUBenchTest, Frontend_UBench_CrossCacheLineFetch) {
     CoreConfig core_cfg;
     core_cfg.fetch_width = 4;
     BranchPredictorConfig bp_cfg;
-    bp_cfg.enabled = false;
+    bp_cfg.type = PredictorType::NONE;
 
     FetchUnit fetch_unit(0x3C, bus, nullptr, core_cfg, bp_cfg);
 

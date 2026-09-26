@@ -51,8 +51,8 @@ public:
         if (core_id >= config_.num_cores) core_id = 0;
 
         auto& l1i = *l1i_caches_[core_id];
-        if (!l1i.get_config().enabled) {
-            if (l2_cache_.get_config().enabled) {
+        if (!l1i.get_config().is_active()) {
+            if (l2_cache_.get_config().is_active()) {
                 auto l2_res = l2_cache_.access(addr, false, current_cycle);
                 if (l2_res.hit) {
                     resp.is_l2_hit = true;
@@ -76,7 +76,7 @@ public:
         }
 
         // L1I Miss -> Query Shared L2
-        if (l2_cache_.get_config().enabled) {
+        if (l2_cache_.get_config().is_active()) {
             auto l2_res = l2_cache_.access(addr, false, current_cycle);
             if (l2_res.hit) {
                 resp.is_l2_hit = true;
@@ -101,8 +101,8 @@ public:
         auto& l1d = *l1d_caches_[core_id];
         
         // If L1D is disabled, bypass directly
-        if (!l1d.get_config().enabled) {
-            if (l2_cache_.get_config().enabled) {
+        if (!l1d.get_config().is_active()) {
+            if (l2_cache_.get_config().is_active()) {
                 auto l2_res = l2_cache_.access(addr, false, current_cycle);
                 if (l2_res.hit) {
                     resp.is_l2_hit = true;
@@ -119,7 +119,7 @@ public:
 
         // Check MESI Coherence State
         CoherenceAction coh_act{};
-        if (config_.enable_mesi_coherence) {
+        if (config_.is_mesi_enabled()) {
             coh_act = coherence_engine_.handle_cpu_read(core_id, addr);
         }
 
@@ -132,7 +132,7 @@ public:
         }
 
         // L1D Miss -> Query Shared L2
-        if (l2_cache_.get_config().enabled) {
+        if (l2_cache_.get_config().is_active()) {
             auto l2_res = l2_cache_.access(addr, false, current_cycle);
             if (l2_res.hit) {
                 resp.is_l2_hit = true;
@@ -158,8 +158,8 @@ public:
         write_bus_data(addr, val, size);
 
         auto& l1d = *l1d_caches_[core_id];
-        if (!l1d.get_config().enabled) {
-            if (l2_cache_.get_config().enabled) {
+        if (!l1d.get_config().is_active()) {
+            if (l2_cache_.get_config().is_active()) {
                 auto l2_res = l2_cache_.access(addr, true, current_cycle);
                 if (l2_res.hit) {
                     resp.is_l2_hit = true;
@@ -174,14 +174,14 @@ public:
 
         // Update MESI Coherence State & Broadcast Invalidation if needed
         CoherenceAction coh_act{};
-        if (config_.enable_mesi_coherence) {
+        if (config_.is_mesi_enabled()) {
             coh_act = coherence_engine_.handle_cpu_write(core_id, addr);
         }
 
         auto l1_res = l1d.access(addr, true, current_cycle);
 
         // If L1 eviction wrote back a dirty line, forward it to L2
-        if (l1_res.evicted && l1_res.evicted_dirty && l2_cache_.get_config().enabled) {
+        if (l1_res.evicted && l1_res.evicted_dirty && l2_cache_.get_config().is_active()) {
             l2_cache_.access(l1_res.evicted_addr, true, current_cycle);
         }
 
@@ -192,7 +192,7 @@ public:
         }
 
         // L1D Miss on Write -> L2 Allocation
-        if (l2_cache_.get_config().enabled) {
+        if (l2_cache_.get_config().is_active()) {
             auto l2_res = l2_cache_.access(addr, true, current_cycle);
             if (l2_res.hit) {
                 resp.is_l2_hit = true;

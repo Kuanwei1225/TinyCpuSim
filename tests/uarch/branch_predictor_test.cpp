@@ -142,7 +142,6 @@ TEST(BranchPredictorTest, ReturnAddressStackPushPopAndWrapAround) {
 
 TEST(BranchPredictorTest, CompositeBranchPredictorCallAndReturnFlow) {
     BranchPredictorConfig cfg;
-    cfg.enabled = true;
     cfg.type = PredictorType::BIMODAL;
     cfg.btb_size = 512;
     cfg.ras_size = 16;

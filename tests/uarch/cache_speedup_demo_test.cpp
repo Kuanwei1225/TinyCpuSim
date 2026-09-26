@@ -22,9 +22,9 @@ TEST(Phase1DemoTest, CacheSpeedupOverUncachedDramAccess) {
     // 1. Run with Cache DISABLED (Direct DRAM access: 80 cycles per access)
     UArchConfig uncached_cfg = UArchConfig::make_in_order_simple();
     uncached_cfg.dram_latency_cycles = 80;
-    uncached_cfg.default_core.l1d.enabled = false;
-    uncached_cfg.l2_shared.enabled = false;
-    uncached_cfg.enable_mesi_coherence = false;
+    uncached_cfg.default_core.l1d.type = CacheType::PASSTHROUGH;
+    uncached_cfg.l2_shared.type = CacheType::PASSTHROUGH;
+    uncached_cfg.coherence = CoherenceProtocol::NONE;
 
     CoherentMemoryHierarchy uncached_mem(bus, uncached_cfg);
 
@@ -40,9 +40,9 @@ TEST(Phase1DemoTest, CacheSpeedupOverUncachedDramAccess) {
     // 2. Run with Cache ENABLED (L1D: 32KB, L2: 512KB)
     UArchConfig cached_cfg = UArchConfig::make_ooo_default();
     cached_cfg.dram_latency_cycles = 80;
-    cached_cfg.default_core.l1d.enabled = true;
+    cached_cfg.default_core.l1d.type = CacheType::SET_ASSOCIATIVE;
     cached_cfg.default_core.l1d.hit_latency_cycles = 1;
-    cached_cfg.l2_shared.enabled = true;
+    cached_cfg.l2_shared.type = CacheType::SET_ASSOCIATIVE;
     cached_cfg.l2_shared.hit_latency_cycles = 10;
 
     CoherentMemoryHierarchy cached_mem(bus, cached_cfg);

@@ -89,7 +89,7 @@ def convert_and_format_file(file_path):
 def validate_file(file_path):
     """Validates configuration parameters in file_path and returns list of warnings."""
     if not os.path.exists(file_path): return ["Configuration file not found."]
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(strict=False, inline_comment_prefixes=('#', ';'))
     try:
         cfg.read(file_path)
     except Exception as e:
@@ -106,7 +106,15 @@ def validate_file(file_path):
         if mode not in ["uarch", "isa_only"]:
             errors.append(f"Invalid mode: '{mode}'. Must be 'uarch' or 'isa_only'.")
 
+    if cfg.has_section("system"):
+        coh = cfg.get("system", "coherence", fallback=cfg.get("system", "coherence_protocol", fallback="MESI")).upper()
+        if coh not in ["MESI", "NONE", "DISABLED"]:
+            errors.append(f"Invalid coherence protocol: '{coh}'. Must be MESI or NONE.")
+
     if cfg.has_section("core"):
+        c_type = cfg.get("core", "type", fallback="OOO_TOMASULO").upper()
+        if c_type not in ["OOO_TOMASULO", "OOO", "SIMPLE_INORDER", "INORDER", "FAST_FEEDER", "FEEDER", "BYPASS"]:
+            errors.append(f"Invalid core type: '{c_type}'. Must be OOO_TOMASULO, SIMPLE_INORDER, or FAST_FEEDER.")
         for w in ["fetch_width", "decode_width", "rename_width", "issue_width", "commit_width"]:
             val = cfg.getint("core", w, fallback=4)
             if val <= 0: errors.append(f"Core {w} must be > 0 (got {val})")
@@ -117,21 +125,30 @@ def validate_file(file_path):
 
     if cfg.has_section("branch_predictor"):
         bp_type = cfg.get("branch_predictor", "type", fallback="TAGE").upper()
-        if bp_type not in ["IDEAL", "BIMODAL", "GSHARE", "TAGE"]:
-            errors.append(f"Invalid branch predictor type: '{bp_type}'. Must be IDEAL, BIMODAL, GSHARE, or TAGE.")
+        if bp_type not in ["NONE", "IDEAL", "BIMODAL", "GSHARE", "TAGE", "DISABLED", "BYPASS"]:
+            errors.append(f"Invalid branch predictor type: '{bp_type}'. Must be NONE, IDEAL, BIMODAL, GSHARE, or TAGE.")
         for table in ["table_size", "btb_size"]:
             t_val = cfg.getint("branch_predictor", table, fallback=4096)
             if not is_power_of_two(t_val):
                 errors.append(f"Branch predictor {table} must be a power of 2 (got {t_val})")
 
-    for c_sec in ["cache_l1i", "cache_l1d", "cache_l2"]:
+    if cfg.has_section("lsu"):
+        lsu_type = cfg.get("lsu", "type", fallback="SPECULATIVE_OOO").upper()
+        if lsu_type not in ["SPECULATIVE_OOO", "OOO", "STRICT_INORDER", "INORDER", "PASSTHROUGH", "BYPASS", "NONE"]:
+            errors.append(f"Invalid LSU type: '{lsu_type}'. Must be SPECULATIVE_OOO, STRICT_INORDER, or PASSTHROUGH.")
+
+    for c_sec in ["cache_l1i", "cache_l1d", "cache_l2", "l1i", "l1d", "l2"]:
         if cfg.has_section(c_sec):
-            c_size = cfg.getint(c_sec, "size_bytes", fallback=32768)
-            c_assoc = cfg.getint(c_sec, "associativity", fallback=4)
-            if not is_power_of_two(c_size):
-                errors.append(f"Cache [{c_sec}] size_bytes must be a power of 2 (got {c_size})")
-            if not is_power_of_two(c_assoc):
-                errors.append(f"Cache [{c_sec}] associativity must be a power of 2 (got {c_assoc})")
+            c_type = cfg.get(c_sec, "type", fallback="SET_ASSOCIATIVE").upper()
+            if c_type not in ["SET_ASSOCIATIVE", "DEFAULT", "DIRECT_MAPPED", "ZERO_LATENCY", "IDEAL", "PASSTHROUGH", "NONE", "BYPASS"]:
+                errors.append(f"Invalid cache type for [{c_sec}]: '{c_type}'. Must be SET_ASSOCIATIVE, DIRECT_MAPPED, ZERO_LATENCY, or PASSTHROUGH.")
+            if c_type != "PASSTHROUGH" and c_type != "NONE" and c_type != "BYPASS":
+                c_size = cfg.getint(c_sec, "size_bytes", fallback=32768)
+                c_assoc = cfg.getint(c_sec, "associativity", fallback=4)
+                if not is_power_of_two(c_size):
+                    errors.append(f"Cache [{c_sec}] size_bytes must be a power of 2 (got {c_size})")
+                if not is_power_of_two(c_assoc):
+                    errors.append(f"Cache [{c_sec}] associativity must be a power of 2 (got {c_assoc})")
 
     return errors
 
@@ -158,7 +175,7 @@ def show_config(file_path=CURRENT_CFG, title="Active Configuration"):
     if not os.path.exists(file_path):
         print(f"File not found: {file_path}")
         return
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(strict=False, inline_comment_prefixes=('#', ';'))
     cfg.read(file_path)
 
     print("\n" + "=" * 80)
@@ -174,17 +191,19 @@ def show_config(file_path=CURRENT_CFG, title="Active Configuration"):
         print(f"  Top-Down TMAM Profiler:  {cfg.get('simulation', 'enable_topdown', fallback='true')}")
         print("-" * 80)
 
-    if cfg.has_section("system"):
+    if cfg.has_section("system") or cfg.has_section("global"):
+        sec = "system" if cfg.has_section("system") else "global"
         print("[system] - Multicore & Interconnect Subsystem")
-        print(f"  Core Count:              {cfg.get('system', 'num_cores', fallback='1')} core(s)")
-        print(f"  Off-chip DRAM Latency:   {cfg.get('system', 'dram_latency_cycles', fallback='80')} clock cycles")
-        print(f"  MESI Snooping Protocol:  {cfg.get('system', 'enable_mesi_coherence', fallback='true')}")
+        print(f"  Core Count:              {cfg.get(sec, 'num_cores', fallback='1')} core(s)")
+        print(f"  Off-chip DRAM Latency:   {cfg.get(sec, 'dram_latency_cycles', fallback=cfg.get(sec, 'dram_latency', fallback='80'))} clock cycles")
+        coh = cfg.get(sec, 'coherence', fallback=cfg.get(sec, 'enable_mesi_coherence', fallback='MESI'))
+        print(f"  Coherence Protocol:      \033[1;32m{coh}\033[0m")
         print("-" * 80)
 
     if cfg.has_section("core"):
-        print("[core] - Superscalar Pipeline & Out-of-Order Engine")
-        is_ooo = cfg.getboolean('core', 'enable_ooo', fallback=True)
-        print(f"  Execution Engine:        \033[1;32m{'Out-of-Order (Tomasulo / ROB)' if is_ooo else 'In-Order (Strict Sequential Issue)'}\033[0m")
+        print("[core] - Superscalar Pipeline & Execution Engine")
+        c_type = cfg.get('core', 'type', fallback='OOO_TOMASULO').upper()
+        print(f"  Module Type:             \033[1;32m{c_type}\033[0m")
         print(f"  Stage Widths (F/D/R/I/C):{cfg.get('core', 'fetch_width', fallback='4')} Fetch / {cfg.get('core', 'decode_width', fallback='4')} Decode / {cfg.get('core', 'rename_width', fallback='4')} Rename / {cfg.get('core', 'issue_width', fallback='4')} Issue / {cfg.get('core', 'commit_width', fallback='4')} Commit")
         print(f"  Reorder Buffer (ROB):    {cfg.get('core', 'rob_size', fallback='64')} entries")
         print(f"  Issue Queue / RS:        {cfg.get('core', 'rs_size', fallback='32')} entries")
@@ -193,9 +212,8 @@ def show_config(file_path=CURRENT_CFG, title="Active Configuration"):
 
     if cfg.has_section("branch_predictor"):
         print("[branch_predictor] - Branch Prediction Unit (BPU)")
-        bp_en = cfg.getboolean('branch_predictor', 'enabled', fallback=True)
-        print(f"  BPU Master Status:       \033[1;{'32mEnabled' if bp_en else '31mDisabled (Always Static Not-Taken)'}\033[0m")
-        print(f"  Direction Predictor:     \033[1;33m{cfg.get('branch_predictor', 'type', fallback='TAGE')}\033[0m (PHT Capacity: {cfg.get('branch_predictor', 'table_size', fallback='4096')} entries)")
+        bp_type = cfg.get('branch_predictor', 'type', fallback='TAGE').upper()
+        print(f"  Module Type:             \033[1;33m{bp_type}\033[0m (PHT Capacity: {cfg.get('branch_predictor', 'table_size', fallback='4096')} entries)")
         print(f"  Branch Target Buffer:    {cfg.get('branch_predictor', 'btb_size', fallback='4096')} entries")
         print(f"  Return Address Stack:    {cfg.get('branch_predictor', 'ras_size', fallback='32')} entries")
         print(f"  TAGE Geometric Tables:   {cfg.get('branch_predictor', 'tage_tables', fallback='4')} tables")
@@ -203,38 +221,24 @@ def show_config(file_path=CURRENT_CFG, title="Active Configuration"):
 
     if cfg.has_section("lsu"):
         print("[lsu] - Load/Store Unit & Memory Disambiguation")
-        lsu_en = cfg.getboolean('lsu', 'enabled', fallback=True)
-        print(f"  LSU Master Status:       \033[1;{'32mEnabled' if lsu_en else '31mDisabled'}\033[0m")
+        lsu_type = cfg.get('lsu', 'type', fallback='SPECULATIVE_OOO').upper()
+        print(f"  Module Type:             \033[1;32m{lsu_type}\033[0m")
         print(f"  Load / Store Queues:     LQ: {cfg.get('lsu', 'lq_size', fallback='16')} entries | SQ: {cfg.get('lsu', 'sq_size', fallback='16')} entries")
-        print(f"  Store-to-Load Bypass:    Forwarding: {cfg.get('lsu', 'enable_store_forwarding', fallback='true')} (Latency: {cfg.get('lsu', 'store_forward_latency', fallback='1')} cycle)")
-        print(f"  Speculative Load Exec:   {cfg.get('lsu', 'enable_speculative_load', fallback='true')}")
+        print(f"  Store-to-Load Bypass:    Latency: {cfg.get('lsu', 'store_forward_latency', fallback='1')} cycle")
         print("-" * 80)
 
     print("[caches] - Multi-Level Memory Hierarchy")
-    if cfg.has_section("cache_l1i"):
-        l1i_en = cfg.getboolean('cache_l1i', 'enabled', fallback=True)
-        l1i_sz = format_byte_size(cfg.get('cache_l1i', 'size_bytes', fallback='32768'))
-        l1i_as = cfg.get('cache_l1i', 'associativity', fallback='4')
-        l1i_ln = cfg.get('cache_l1i', 'line_size', fallback='64')
-        l1i_lat = cfg.get('cache_l1i', 'hit_latency_cycles', fallback='1')
-        l1i_mshr = cfg.get('cache_l1i', 'mshr_entries', fallback='8')
-        print(f"  L1 Instruction Cache:    {l1i_sz} | {l1i_as}-way | Block: {l1i_ln}B | Latency: {l1i_lat} cyc | MSHRs: {l1i_mshr} ({'Enabled' if l1i_en else 'Off'})")
-    if cfg.has_section("cache_l1d"):
-        l1d_en = cfg.getboolean('cache_l1d', 'enabled', fallback=True)
-        l1d_sz = format_byte_size(cfg.get('cache_l1d', 'size_bytes', fallback='32768'))
-        l1d_as = cfg.get('cache_l1d', 'associativity', fallback='4')
-        l1d_ln = cfg.get('cache_l1d', 'line_size', fallback='64')
-        l1d_lat = cfg.get('cache_l1d', 'hit_latency_cycles', fallback='1')
-        l1d_mshr = cfg.get('cache_l1d', 'mshr_entries', fallback='8')
-        print(f"  L1 Data Cache:           {l1d_sz} | {l1d_as}-way | Block: {l1d_ln}B | Latency: {l1d_lat} cyc | MSHRs: {l1d_mshr} ({'Enabled' if l1d_en else 'Off'})")
-    if cfg.has_section("cache_l2"):
-        l2_en = cfg.getboolean('cache_l2', 'enabled', fallback=True)
-        l2_sz = format_byte_size(cfg.get('cache_l2', 'size_bytes', fallback='524288'))
-        l2_as = cfg.get('cache_l2', 'associativity', fallback='8')
-        l2_ln = cfg.get('cache_l2', 'line_size', fallback='64')
-        l2_lat = cfg.get('cache_l2', 'hit_latency_cycles', fallback='10')
-        l2_mshr = cfg.get('cache_l2', 'mshr_entries', fallback='16')
-        print(f"  Shared L2 Cache:         {l2_sz} | {l2_as}-way | Block: {l2_ln}B | Latency: {l2_lat} cyc | MSHRs: {l2_mshr} ({'Enabled' if l2_en else 'Off'})")
+    for sec, name in [("cache_l1i", "L1 Instruction Cache"), ("l1i", "L1 Instruction Cache"),
+                      ("cache_l1d", "L1 Data Cache"), ("l1d", "L1 Data Cache"),
+                      ("cache_l2", "Shared L2 Cache"), ("l2", "Shared L2 Cache")]:
+        if cfg.has_section(sec):
+            c_type = cfg.get(sec, 'type', fallback='SET_ASSOCIATIVE').upper()
+            c_sz = format_byte_size(cfg.get(sec, 'size_bytes', fallback='32768'))
+            c_as = cfg.get(sec, 'associativity', fallback='4')
+            c_ln = cfg.get(sec, 'line_size', fallback='64')
+            c_lat = cfg.get(sec, 'hit_latency_cycles', fallback=cfg.get(sec, 'hit_latency', fallback='1'))
+            c_mshr = cfg.get(sec, 'mshr_entries', fallback='8')
+            print(f"  {name:<24} Type: {c_type:<16} | {c_sz} | {c_as}-way | Block: {c_ln}B | Latency: {c_lat} cyc | MSHRs: {c_mshr}")
     print("=" * 80)
 
 def run_sweep(sweep_cfg_files=None):

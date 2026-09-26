@@ -137,7 +137,7 @@ TEST(CacheTest, InvalidateLineRemovesEntry) {
 
 TEST(CacheTest, BypassModeReturnsZeroLatencyHits) {
     CacheConfig cfg;
-    cfg.enabled = false;
+    cfg.type = CacheType::PASSTHROUGH;
     Cache cache(cfg, "BypassedCache");
 
     auto res = cache.access(0x1234, false);

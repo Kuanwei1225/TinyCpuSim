@@ -135,11 +135,28 @@ Configuration management is organized into a clean 3-repository model under `con
 
 ```text
 configs/
-├── current.cfg         # Active simulation configuration
-├── default/            # Immutable baseline presets (default.cfg, multicore.cfg)
-├── save/               # User custom snapshots (e.g. my_wide_core.cfg)
+├── current.cfg         # Active simulation configuration (linked/copied from default/)
+├── default/            # Standard modular presets
+│   ├── default.cfg             # 4-wide OoO (Tomasulo), TAGE BPU, 32KB L1I/D, 512KB L2
+│   ├── multicore_4core.cfg     # 4 Cores OoO, MESI Cache Coherence, 2MB Shared L2
+│   ├── mem_fast_feeder.cfg     # FAST_FEEDER core + IDEAL BPU + full cache hierarchy (50x fast mem eval)
+│   ├── bpu_standalone.cfg      # FAST_FEEDER core + TAGE BPU + ZERO_LATENCY caches (isolated BPU eval)
+│   └── inorder_embedded.cfg    # SIMPLE_INORDER 1-wide core + BIMODAL + un-cached passthrough
+├── save/               # User custom snapshots (e.g. my_opt_v1.cfg)
 └── sweep/              # Batch parameter sweep configurations
 ```
+
+### Polymorphic Subsystem Selection
+
+Instead of monolithic binary switches, every subsystem supports pluggable polymorphic module types:
+
+| Subsystem | Configuration Key | Supported Polymorphic Options | Purpose / Behavior |
+| :--- | :--- | :--- | :--- |
+| **Execution Core** | `core.type` | `OOO_TOMASULO`, `SIMPLE_INORDER`, `FAST_FEEDER` | Full out-of-order execution, strict sequential in-order issue, or high-throughput fast feeder. |
+| **Branch Predictor** | `branch_predictor.type` | `NONE`, `IDEAL`, `BIMODAL`, `GSHARE`, `TAGE` | Hardware branch predictor algorithms or ideal 100% bypass. |
+| **Load/Store Unit** | `lsu.type` | `SPECULATIVE_OOO`, `STRICT_INORDER`, `PASSTHROUGH` | Speculative store forwarding / memory disambiguation, or passthrough. |
+| **Cache Hierarchy** | `cache.type` | `SET_ASSOCIATIVE`, `DIRECT_MAPPED`, `ZERO_LATENCY`, `PASSTHROUGH` | Multi-way set associative, direct mapped, zero-latency hit, or un-cached bypass. |
+| **Coherence** | `system.coherence` | `MESI`, `NONE` | Multi-core MESI snooping protocol or disabled. |
 
 ### Key Capabilities:
 - **Direct Editor Integration**: Edit the active configuration directly using `vi` via `./run.sh edit`.
@@ -147,9 +164,9 @@ configs/
 - **Microarchitecture Dashboard**: Run `./run.sh show` to inspect all 6 hardware subsystems:
   1. Target Workload
   2. Multicore / MESI Coherence / DRAM Latency
-  3. Superscalar Pipeline & Out-of-Order Tomasulo Engine
-  4. Branch Prediction Unit (TAGE / BTB / RAS)
-  5. Load/Store Unit & Memory Disambiguation
+  3. Superscalar Pipeline & Execution Engine (`OOO_TOMASULO`, `SIMPLE_INORDER`, `FAST_FEEDER`)
+  4. Branch Prediction Unit (TAGE / BTB / RAS / Ideal)
+  5. Load/Store Unit & Memory Disambiguation (`SPECULATIVE_OOO`, `PASSTHROUGH`)
   6. Multi-Level Cache Hierarchy (L1I, L1D, Shared L2, MSHRs)
 
 ---

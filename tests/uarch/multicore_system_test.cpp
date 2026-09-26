@@ -6,7 +6,7 @@ using namespace tinyarmsim::uarch;
 
 TEST(MultiCoreSystemTest, FourCoreConcurrentExecutionAndStatsAggregation) {
     UArchConfig cfg = UArchConfig::make_multicore_default(4);
-    cfg.enable_mesi_coherence = true;
+    cfg.coherence = CoherenceProtocol::MESI;
 
     MultiCoreSystem system(cfg, 1024 * 1024);
     EXPECT_EQ(system.num_cores(), 4);

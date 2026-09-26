@@ -9,4 +9,4 @@ echo "============================================================"
 echo " [Step 5/5] TinyCpuSim vs gem5 Golden Reference Accuracy   "
 echo "============================================================"
 
-python3 "${PROJECT_ROOT}/scripts/compare_with_gem5.py" "${@:---all}"
+python3 "${PROJECT_ROOT}/scripts/verify_gem5.py" "$@"

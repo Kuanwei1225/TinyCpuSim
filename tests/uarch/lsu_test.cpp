@@ -27,7 +27,7 @@ TEST(LsuTest, LoadAndStoreQueueAllocationAndCapacity) {
 
 TEST(LsuTest, StoreToLoadForwardingExactAddressMatch) {
     LsuConfig cfg;
-    cfg.enable_store_forwarding = true;
+    cfg.type = LsuType::SPECULATIVE_OOO;
     cfg.store_forward_latency = 1;
 
     LoadStoreUnit lsu(cfg, nullptr);

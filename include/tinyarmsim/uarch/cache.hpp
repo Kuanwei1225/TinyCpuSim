@@ -74,7 +74,7 @@ public:
 
     // Fast read probe without updating LRU or tracking stats (used for debugging/snooping)
     [[nodiscard]] bool probe(uint32_t addr) const noexcept {
-        if (!config_.enabled) return true;
+        if (!config_.is_active()) return true;
         uint32_t set_idx = extract_index(addr);
         uint32_t tag = extract_tag(addr);
         const auto& set = sets_[set_idx];
@@ -89,7 +89,14 @@ public:
     // Access method: Simulates a cache lookup and replacement
     CacheAccessResult access(uint32_t addr, bool is_write, uint64_t current_cycle = 0) {
         CacheAccessResult res{};
-        if (!config_.enabled) {
+        if (!config_.is_active()) {
+            res.hit = true;
+            res.latency_cycles = 0;
+            stats_.record_access(true);
+            return res;
+        }
+
+        if (config_.is_zero_latency()) {
             res.hit = true;
             res.latency_cycles = 0;
             stats_.record_access(true);
@@ -150,7 +157,7 @@ public:
 
     // Invalidate a line (e.g. from MESI snoop invalidate on remote write)
     bool invalidate_line(uint32_t addr) {
-        if (!config_.enabled) return false;
+        if (!config_.is_active()) return false;
         uint32_t set_idx = extract_index(addr);
         uint32_t tag = extract_tag(addr);
         auto& set = sets_[set_idx];
@@ -169,7 +176,7 @@ public:
     // Flush all dirty lines (returns list of dirty addresses written back)
     std::vector<uint32_t> flush() {
         std::vector<uint32_t> dirty_addrs;
-        if (!config_.enabled) return dirty_addrs;
+        if (!config_.is_active()) return dirty_addrs;
 
         for (size_t set_idx = 0; set_idx < num_sets_; ++set_idx) {
             for (auto& line : sets_[set_idx].lines) {
@@ -198,7 +205,7 @@ public:
 
 private:
     void init_geometry() {
-        if (!config_.enabled) {
+        if (!config_.is_active()) {
             num_sets_ = 1;
             offset_bits_ = 0;
             index_bits_ = 0;

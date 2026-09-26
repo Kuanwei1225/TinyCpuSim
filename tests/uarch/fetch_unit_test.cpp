@@ -19,7 +19,7 @@ TEST(FetchUnitTest, FetchesMixedThumb16AndThumb32Instructions) {
     CoreConfig core_cfg;
     core_cfg.fetch_width = 4;
     BranchPredictorConfig bp_cfg;
-    bp_cfg.enabled = false;
+    bp_cfg.type = PredictorType::NONE;
 
     FetchUnit fetch(0x1000, bus, nullptr, core_cfg, bp_cfg);
 
@@ -74,7 +74,7 @@ TEST(FetchUnitTest, BranchPredictorRedirectsFetchPc) {
     CoreConfig core_cfg;
     core_cfg.fetch_width = 2;
     BranchPredictorConfig bp_cfg;
-    bp_cfg.enabled = true;
+    bp_cfg.type = PredictorType::BIMODAL;
     bp_cfg.btb_size = 512;
 
     FetchUnit fetch(0x1000, bus, nullptr, core_cfg, bp_cfg);

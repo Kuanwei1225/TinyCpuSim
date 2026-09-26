@@ -399,7 +399,7 @@ public:
 
     [[nodiscard]] BranchPrediction predict(uint32_t pc) noexcept {
         BranchPrediction pred;
-        if (!config_.enabled) {
+        if (!config_.is_active()) {
             return pred;
         }
 
@@ -472,7 +472,7 @@ public:
     }
 
     void update(uint32_t pc, bool taken, uint32_t actual_target, BranchType type, const BranchPrediction& pred) noexcept {
-        if (!config_.enabled) return;
+        if (!config_.is_active()) return;
 
         // Update BTB
         btb_.update(pc, actual_target, type);

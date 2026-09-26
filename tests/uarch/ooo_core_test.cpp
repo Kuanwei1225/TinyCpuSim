@@ -22,7 +22,7 @@ TEST(OoOCoreTest, ExecutesLinearInstructionSequenceAndRetires) {
     CoreConfig cfg;
     cfg.fetch_width = 4;
     cfg.commit_width = 4;
-    cfg.branch_predictor.enabled = false;
+    cfg.branch_predictor.type = PredictorType::NONE;
 
     OoOCore core(0, cfg, bus, nullptr, nullptr, 0x1000);
 

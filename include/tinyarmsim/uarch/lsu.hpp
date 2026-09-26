@@ -166,7 +166,7 @@ public:
         LoadResult res;
 
         // 1. Store-to-Load Forwarding Check (Search older SQ entries)
-        if (config_.enable_store_forwarding) {
+        if (config_.is_active()) {
             int best_match = -1;
             uint64_t latest_older_seq = 0;
 
@@ -220,7 +220,7 @@ public:
         }
         res.data = bus_data;
 
-        if (l1d_ && l1d_->get_config().enabled) {
+        if (l1d_ && l1d_->get_config().is_active()) {
             uint32_t lat = 1;
             auto cache_res = l1d_->access(addr, false, lat);
             res.completed = true;
@@ -248,7 +248,7 @@ public:
                 bus_->write32(sq.addr, sq.data);
             }
         }
-        if (l1d_ && l1d_->get_config().enabled) {
+        if (l1d_ && l1d_->get_config().is_active()) {
             uint32_t lat = 1;
             l1d_->access(sq.addr, true, lat);
         }

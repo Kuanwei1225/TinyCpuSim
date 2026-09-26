@@ -14,7 +14,6 @@ using namespace tinyarmsim::uarch;
 // 1. L1 cache hit latency, tag matching, and statistics tracking
 TEST(CacheUBenchTest, Cache_UBench_L1HitLatencyAndThroughput) {
     CacheConfig cfg;
-    cfg.enabled = true;
     cfg.size_bytes = 4096;
     cfg.line_size = 64;
     cfg.associativity = 4;
@@ -46,7 +45,6 @@ TEST(CacheUBenchTest, Cache_UBench_L1HitLatencyAndThroughput) {
 // 2. N-way Set Associativity and LRU replacement algorithm precision
 TEST(CacheUBenchTest, Cache_UBench_LruReplacementSetAssociativity) {
     CacheConfig cfg;
-    cfg.enabled = true;
     cfg.size_bytes = 256;      // 256 bytes total
     cfg.line_size = 64;        // 4 lines total
     cfg.associativity = 2;     // 2 sets, 2 ways per set
@@ -88,7 +86,6 @@ TEST(CacheUBenchTest, Cache_UBench_LruReplacementSetAssociativity) {
 // 3. Write-back dirty line eviction and writeback counter tracking
 TEST(CacheUBenchTest, Cache_UBench_WriteBackDirtyEviction) {
     CacheConfig cfg;
-    cfg.enabled = true;
     cfg.size_bytes = 128;      // 128 bytes
     cfg.line_size = 64;        // 2 lines total
     cfg.associativity = 1;     // Direct mapped: 2 sets (Set 0 and Set 1)
@@ -114,7 +111,6 @@ TEST(CacheUBenchTest, Cache_UBench_WriteBackDirtyEviction) {
 // 4. Non-blocking MSHR (Miss Status Holding Register) capacity allocation
 TEST(CacheUBenchTest, Cache_UBench_MshrNonBlockingAllocation) {
     CacheConfig cfg;
-    cfg.enabled = true;
     cfg.size_bytes = 1024;
     cfg.line_size = 64;
     cfg.associativity = 2;
@@ -178,12 +174,10 @@ TEST(CacheUBenchTest, Cache_UBench_SharedL2HierarchicalInclusion) {
     cfg.num_cores = 1;
     cfg.dram_latency_cycles = 50;
 
-    cfg.default_core.l1d.enabled = true;
     cfg.default_core.l1d.size_bytes = 512;
     cfg.default_core.l1d.line_size = 64;
     cfg.default_core.l1d.hit_latency_cycles = 2;
 
-    cfg.l2_shared.enabled = true;
     cfg.l2_shared.size_bytes = 4096;
     cfg.l2_shared.line_size = 64;
     cfg.l2_shared.hit_latency_cycles = 10;

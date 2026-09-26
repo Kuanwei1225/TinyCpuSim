@@ -9,7 +9,7 @@ TEST(UArchConfigTest, DefaultOooConfigValidatesSuccessfully) {
     UArchConfig cfg = UArchConfig::make_ooo_default();
     EXPECT_NO_THROW(cfg.validate());
     EXPECT_EQ(cfg.num_cores, 1);
-    EXPECT_TRUE(cfg.default_core.enable_ooo);
+    EXPECT_TRUE(cfg.default_core.is_ooo());
     EXPECT_EQ(cfg.default_core.fetch_width, 4);
     EXPECT_EQ(cfg.default_core.rob_size, 64);
     EXPECT_EQ(cfg.default_core.l1i.num_sets(), 128); // 32KB / (64B * 4) = 128 sets
@@ -18,10 +18,11 @@ TEST(UArchConfigTest, DefaultOooConfigValidatesSuccessfully) {
 TEST(UArchConfigTest, InOrderSimpleConfigValidates) {
     UArchConfig cfg = UArchConfig::make_in_order_simple();
     EXPECT_NO_THROW(cfg.validate());
-    EXPECT_FALSE(cfg.default_core.enable_ooo);
+    EXPECT_FALSE(cfg.default_core.is_ooo());
+    EXPECT_TRUE(cfg.default_core.is_simple_inorder());
     EXPECT_EQ(cfg.default_core.rob_size, 1);
-    EXPECT_FALSE(cfg.default_core.l1i.enabled);
-    EXPECT_FALSE(cfg.enable_mesi_coherence);
+    EXPECT_FALSE(cfg.default_core.l1i.is_active());
+    EXPECT_FALSE(cfg.is_mesi_enabled());
 }
 
 TEST(UArchConfigTest, InvalidCacheGeometryThrowsException) {
@@ -40,24 +41,23 @@ TEST(UArchConfigTest, ParseKvConfigurationWithCommentsAndSections) {
 # Multi-Core Simulation Config
 [global]
 num_cores = 2
-enable_mesi = true
+coherence = MESI
 dram_latency = 100
 
 [core]
-enable_ooo = true
+type = OOO_TOMASULO
 fetch_width = 8
 rob_size = 128
 rs_size = 64
 num_phys_regs = 256
 
 [l1d]
-enabled = true
+type = SET_ASSOCIATIVE
 size_bytes = 65536
 associativity = 8
 hit_latency = 2
 
 [branch_predictor]
-enabled = true
 type = TAGE
 table_size = 8192
 )";
@@ -66,7 +66,7 @@ table_size = 8192
     UArchConfig cfg = UArchConfig::parse_kv(iss);
 
     EXPECT_EQ(cfg.num_cores, 2);
-    EXPECT_TRUE(cfg.enable_mesi_coherence);
+    EXPECT_TRUE(cfg.is_mesi_enabled());
     EXPECT_EQ(cfg.dram_latency_cycles, 100);
     EXPECT_EQ(cfg.default_core.fetch_width, 8);
     EXPECT_EQ(cfg.default_core.rob_size, 128);
