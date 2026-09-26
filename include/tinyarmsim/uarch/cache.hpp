@@ -51,6 +51,13 @@ public:
     [[nodiscard]] const CacheStats& get_stats() const noexcept { return stats_; }
     void reset_stats() noexcept { stats_ = CacheStats{}; }
 
+    void set_next_level(Cache* next, uint32_t mem_latency = 80) noexcept {
+        next_level_ = next;
+        mem_latency_cycles_ = mem_latency;
+    }
+
+    [[nodiscard]] Cache* get_next_level() const noexcept { return next_level_; }
+
     [[nodiscard]] uint32_t get_offset_bits() const noexcept { return offset_bits_; }
     [[nodiscard]] uint32_t get_index_bits() const noexcept { return index_bits_; }
     [[nodiscard]] size_t get_num_sets() const noexcept { return num_sets_; }
@@ -126,7 +133,14 @@ public:
         // 2. Cache Miss: Update stats
         stats_.record_access(false);
         res.hit = false;
-        res.latency_cycles = config_.hit_latency_cycles; // Base hit check latency before miss penalty
+        uint32_t miss_penalty = 0;
+        if (next_level_ && next_level_->get_config().is_active()) {
+            auto next_res = next_level_->access(addr, is_write, current_cycle);
+            miss_penalty = next_res.latency_cycles;
+        } else {
+            miss_penalty = mem_latency_cycles_;
+        }
+        res.latency_cycles = config_.hit_latency_cycles + miss_penalty;
 
         // 3. Find invalid line or evict via replacement policy
         size_t victim_idx = find_victim_line(set);
@@ -293,6 +307,8 @@ private:
     std::vector<MSHREntry> mshr_;
     uint64_t access_counter_{0};
     CacheStats stats_{};
+    Cache* next_level_{nullptr};
+    uint32_t mem_latency_cycles_{80};
 };
 
 } // namespace tinyarmsim::uarch

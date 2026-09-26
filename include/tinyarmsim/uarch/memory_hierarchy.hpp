@@ -33,9 +33,14 @@ public:
 
         for (size_t i = 0; i < num_cores; ++i) {
             const auto& core_cfg = config.get_core_config(i);
-            l1i_caches_.push_back(std::make_unique<Cache>(core_cfg.l1i, "Core" + std::to_string(i) + "_L1I"));
-            l1d_caches_.push_back(std::make_unique<Cache>(core_cfg.l1d, "Core" + std::to_string(i) + "_L1D"));
+            auto l1i = std::make_unique<Cache>(core_cfg.l1i, "Core" + std::to_string(i) + "_L1I");
+            auto l1d = std::make_unique<Cache>(core_cfg.l1d, "Core" + std::to_string(i) + "_L1D");
+            l1i->set_next_level(&l2_cache_, config.dram_latency_cycles);
+            l1d->set_next_level(&l2_cache_, config.dram_latency_cycles);
+            l1i_caches_.push_back(std::move(l1i));
+            l1d_caches_.push_back(std::move(l1d));
         }
+        l2_cache_.set_next_level(nullptr, config.dram_latency_cycles);
     }
 
     [[nodiscard]] size_t get_num_cores() const noexcept { return config_.num_cores; }

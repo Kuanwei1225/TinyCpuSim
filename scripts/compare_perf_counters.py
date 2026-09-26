@@ -138,11 +138,13 @@ def parse_tinysim_stats(output_text):
         stats['dcache_accesses'] = int(m.group(2))
         stats['dcache_misses'] = stats['dcache_accesses'] - stats['dcache_hits']
 
-    m = re.search(r'Shared L2 Cache Hit Rate:\s*[\d\.]+% \((\d+)/(\d+)\)', output_text)
+    m = re.search(r'L2 Accesses:\s+(\d+)', output_text)
+    if m:
+        stats['l2_accesses'] = int(m.group(1))
+    m = re.search(r'L2 Hits / Misses:\s+(\d+)\s+/\s+(\d+)', output_text)
     if m:
         stats['l2_hits'] = int(m.group(1))
-        stats['l2_accesses'] = int(m.group(2))
-        stats['l2_misses'] = stats['l2_accesses'] - stats['l2_hits']
+        stats['l2_misses'] = int(m.group(2))
 
     # Ports
     m = re.search(r'Port ALU uOps:\s+(\d+)', output_text)
