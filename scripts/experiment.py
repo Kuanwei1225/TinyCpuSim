@@ -384,6 +384,24 @@ mshr_entries = 16
     tmp.close()
     return tmp.name
 
+def format_report_header(elf_path, cfg_file, overrides_list=None):
+    import datetime
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    header = [
+        "================================================================================",
+        "                  TinyCpuSim uArch Simulation Performance Report                ",
+        "================================================================================",
+        f"  Target Program:        {elf_path}",
+        f"  Generation Timestamp:  {now_str}",
+        f"  Applied Configuration: {cfg_file}",
+    ]
+    if overrides_list:
+        header.append("  Active Hardware Overrides:")
+        for sec, key, old_v, new_v in overrides_list:
+            header.append(f"    • [{sec}] {key} = {new_v}")
+    header.append("--------------------------------------------------------------------------------")
+    return "\n".join(header) + "\n\n"
+
 def run_sim(sim_bin, elf_file, cfg_file):
     cmd = [sim_bin, "--uarch", "--uarch-config", cfg_file, "--all-perf", elf_file]
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -522,6 +540,33 @@ def print_comparison_table(elf_name, changed_params, base_stats, exp_stats):
         print(f"  {ins}")
     print("=" * 84)
 
+def list_baselines(reports_dir):
+    default_dir = os.path.join(reports_dir, "default")
+    print("=" * 80)
+    print("            TinyCpuSim Default Baseline Reports (reports/default/)           ")
+    print("=" * 80)
+    if not os.path.exists(default_dir):
+        print("  (No default baseline reports found in reports/default/)")
+        print("=" * 80)
+        return
+    
+    files = sorted(glob.glob(os.path.join(default_dir, "*.txt")))
+    if not files:
+        print("  (No default baseline reports found in reports/default/)")
+        print("=" * 80)
+        return
+
+    print(f"{'Target ELF Workload':<28} | {'Cycles':<10} | {'IPC':<8} | {'Report File'}")
+    print("-" * 80)
+    for f in files:
+        with open(f, 'r') as fp:
+            stats = parse_perf_output(fp.read())
+        elf_name = os.path.basename(f).replace('.txt', '.elf')
+        cycles = str(stats.get('cycles', 'N/A'))
+        ipc = f"{stats.get('ipc', 0.0):.3f}" if stats.get('ipc') else 'N/A'
+        print(f"{elf_name:<28} | {cycles:<10} | {ipc:<8} | {os.path.basename(f)}")
+    print("=" * 80)
+
 def main():
     parser = argparse.ArgumentParser(
         description="TinyCpuSim Microarchitectural Experiment & Parameter Tuning Tool",
@@ -531,10 +576,40 @@ def main():
     parser.add_argument("--set", "-s", action="append", help="Override hardware parameter: --set <param>=<value>\n(e.g. --set rob=128 --set width=8 --set l1d_size=64KB --set bp=TAGE)")
     parser.add_argument("--config", "-c", help="Baseline configuration file or snapshot name in configs/save/ or configs/default/")
     parser.add_argument("--base-report", "-br", help="Optional pre-existing baseline report text file to compare against (skips baseline simulation)")
+    parser.add_argument("--re-run-baseline", action="store_true", help="Force re-running baseline simulation instead of using reports/default/")
+    parser.add_argument("--baseline-list", action="store_true", help="List all established default baseline reports in reports/default/")
+    parser.add_argument("--baseline-set", nargs=2, metavar=("ELF", "REPORT"), help="Re-anchor the baseline for ELF to a specific report file")
+    parser.add_argument("--baseline-update", metavar="ELF", help="Re-run baseline simulation for ELF using active/default config and save to reports/default/")
     parser.add_argument("--list-params", "-lp", action="store_true", help="List all tunable microarchitecture parameters with descriptions")
     parser.add_argument("--list-elfs", "-le", action="store_true", help="List all available built-in test benchmark ELF files")
     parser.add_argument("--output", "-o", help="Optional report file path to save output")
     args = parser.parse_args()
+
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sim_bin = os.path.join(root_dir, "build", "tinycpusim")
+    fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
+    reports_dir = os.path.join(root_dir, "reports")
+    default_reports_dir = os.path.join(reports_dir, "default")
+    configs_dir = os.path.join(root_dir, "configs")
+    os.makedirs(reports_dir, exist_ok=True)
+    os.makedirs(default_reports_dir, exist_ok=True)
+
+    if args.baseline_list:
+        list_baselines(reports_dir)
+        sys.exit(0)
+
+    if args.baseline_set:
+        elf_arg, report_src = args.baseline_set
+        if not elf_arg.endswith('.elf'): elf_arg += '.elf'
+        elf_base = os.path.basename(elf_arg).replace('.elf', '')
+        dest_report = os.path.join(default_reports_dir, f"{elf_base}.txt")
+        if not os.path.exists(report_src):
+            print(f"Error: Source report file not found: {report_src}")
+            sys.exit(1)
+        import shutil
+        shutil.copyfile(report_src, dest_report)
+        print(f"\033[1;32m[OK]\033[0m Re-anchored baseline for {elf_arg} to: \033[1m{dest_report}\033[0m")
+        sys.exit(0)
 
     if args.list_params:
         list_parameters()
@@ -544,17 +619,32 @@ def main():
         list_elfs()
         sys.exit(0)
 
+    # Resolve target ELFs
+    elf_targets = []
+    if args.baseline_update:
+        target = args.baseline_update
+        if not target.endswith('.elf'): target += '.elf'
+        full_path = target if os.path.isabs(target) else os.path.join(fixtures_dir, os.path.basename(target))
+        if not os.path.exists(full_path):
+            print(f"Error: ELF fixture not found: {full_path}")
+            sys.exit(1)
+        
+        default_base_cfg = os.path.join(configs_dir, "default", "default.cfg")
+        if not os.path.exists(default_base_cfg):
+            default_base_cfg = os.path.join(configs_dir, "current.cfg")
+        print(f"Re-running baseline simulation for {os.path.basename(full_path)}...")
+        base_stats, log_text = run_sim(sim_bin, full_path, default_base_cfg)
+        dest_report = os.path.join(default_reports_dir, f"{os.path.basename(full_path).replace('.elf', '')}.txt")
+        with open(dest_report, 'w') as fp:
+            fp.write(format_report_header(full_path, default_base_cfg))
+            fp.write(log_text)
+        print(f"\033[1;32m[OK]\033[0m Updated default baseline report: \033[1m{dest_report}\033[0m")
+        sys.exit(0)
+
     if not args.elf:
         print("Error: No target ELF specified. Use --elf <name> or --list-elfs to see available workloads.")
         print("Run 'python3 scripts/experiment.py --help' or 'python3 scripts/experiment.py --list-params' for options.")
         sys.exit(1)
-
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sim_bin = os.path.join(root_dir, "build", "tinycpusim")
-    fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
-    reports_dir = os.path.join(root_dir, "reports")
-    configs_dir = os.path.join(root_dir, "configs")
-    os.makedirs(reports_dir, exist_ok=True)
 
     # Smart baseline config resolution
     base_cfg = None
@@ -586,8 +676,6 @@ def main():
         print(f"Simulator binary not found. Running build first...")
         subprocess.run([os.path.join(root_dir, "scripts", "01_build.sh")], check=True)
 
-    # Resolve target ELFs
-    elf_targets = []
     for item in args.elf.split(','):
         item = item.strip()
         if not item: continue
@@ -645,31 +733,47 @@ def main():
 
     try:
         for elf_path in elf_targets:
-            # 1. Obtain Baseline Stats (from pre-existing report file or by simulating base_cfg)
+            elf_base = os.path.basename(elf_path).replace('.elf', '')
+            default_base_report = os.path.join(default_reports_dir, f"{elf_base}.txt")
+
+            # 1. Resolve Baseline Stats
+            base_source_label = ""
             if args.base_report and os.path.exists(args.base_report):
                 with open(args.base_report, 'r') as f_br:
                     base_stats = parse_perf_output(f_br.read())
-                print(f"  Loaded pre-existing baseline report from: \033[1;36m{args.base_report}\033[0m")
+                base_source_label = f"Custom Report ({args.base_report})"
+            elif not args.config and not args.re_run_baseline and os.path.exists(default_base_report):
+                with open(default_base_report, 'r') as f_dbr:
+                    base_stats = parse_perf_output(f_dbr.read())
+                base_source_label = f"Default Baseline Cache ({default_base_report})"
             else:
-                base_stats, _ = run_sim(sim_bin, elf_path, base_cfg)
+                print(f"Simulating baseline run for {os.path.basename(elf_path)} on {os.path.basename(base_cfg)}...")
+                base_stats, base_log = run_sim(sim_bin, elf_path, base_cfg)
+                # Save to reports/default/ if default config was used
+                if not args.config:
+                    with open(default_base_report, 'w') as f_dbr:
+                        f_dbr.write(format_report_header(elf_path, base_cfg))
+                        f_dbr.write(base_log)
+                base_source_label = f"Live Baseline Simulation ({base_cfg})"
 
-            # 2. Run Experiment
-            exp_stats, full_log = run_sim(sim_bin, elf_path, exp_cfg)
+            # 2. Run Experiment Simulation
+            print(f"Simulating experiment run with parameter modifications...")
+            exp_stats, exp_log = run_sim(sim_bin, elf_path, exp_cfg)
+
             # 3. Print Comparison
+            print(f"\n  [Baseline Source: \033[1;36m{base_source_label}\033[0m]")
             print_comparison_table(elf_path, changed_params, base_stats, exp_stats)
             
             out_file = args.output
             if not out_file:
                 import datetime
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                base_name = os.path.basename(elf_path).replace('.elf', '')
-                out_file = os.path.join(reports_dir, f"exp_{base_name}_{ts}.txt")
+                out_file = os.path.join(reports_dir, f"exp_{elf_base}_{ts}.txt")
 
-            with open(out_file, 'a') as f_out:
-                f_out.write(f"\n=== Experiment: {os.path.basename(elf_path)} ===\n")
-                f_out.write(f"Baseline Config: {base_cfg}\n")
-                f_out.write(full_log)
-            print(f"  Full performance log written to: \033[1;36m{out_file}\033[0m")
+            with open(out_file, 'w') as f_out:
+                f_out.write(format_report_header(elf_path, exp_cfg, changed_params))
+                f_out.write(exp_log)
+            print(f"  Experiment performance report saved to: \033[1;36m{out_file}\033[0m")
 
     finally:
         if os.path.exists(exp_cfg):

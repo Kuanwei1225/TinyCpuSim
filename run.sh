@@ -51,22 +51,57 @@ run_interactive_exp() {
     python3 "${PROJECT_ROOT}/scripts/experiment.py" --elf "${target_elf}" --config "${base_choice}" --set "${param_override}"
 }
 
+show_help() {
+    print_banner
+    echo "TinyCpuSim Unified Command Line & Menu Interface Manual"
+    echo "============================================================"
+    echo "Workflow Steps:"
+    echo "  ./run.sh build                      # [Step 1] Build simulator (Release mode)"
+    echo "  ./run.sh test                       # [Step 2] Run 156+ unit & regression tests"
+    echo "  ./run.sh ubench [bpu|exec|rob|cache|all] # [Step 3] Run component microbenchmarks"
+    echo "  ./run.sh sim [elf] [config]         # [Step 4] Run simulation (zero-args reads current.cfg)"
+    echo "  ./run.sh gem5 [--all]               # [Step 5] Compare accuracy vs gem5 golden"
+    echo ""
+    echo "Configuration & Editing:"
+    echo "  ./run.sh edit                       # Direct vi editing of active configs/current.cfg"
+    echo "  ./run.sh show                       # Display full active microarchitecture dashboard"
+    echo "  ./run.sh list                       # List all presets and snapshots in default/, save/, sweep/"
+    echo "  ./run.sh config                     # Launch interactive configuration manager TUI"
+    echo ""
+    echo "Microarchitectural Experiments & Baseline Management:"
+    echo "  ./run.sh exp                        # Launch Interactive Parameter Experiment Wizard"
+    echo "  ./run.sh exp --elf <elf> --set k=v  # Run parameter experiment vs cached baseline"
+    echo "  ./run.sh baseline list              # List all established baseline reports in reports/default/"
+    echo "  ./run.sh baseline update <elf>      # Re-simulate & update baseline report for target ELF"
+    echo "  ./run.sh baseline set <elf> <rep>   # Re-anchor baseline for target ELF to a specific report file"
+    echo "  ./run.sh sweep                      # Run batch parameter sweep on configs/sweep/"
+    echo ""
+    echo "Catalogs & Utilities:"
+    echo "  ./run.sh knobs                      # List all tunable hardware parameters & units"
+    echo "  ./run.sh elfs                       # List all built-in benchmark ELF workloads"
+    echo "  ./run.sh clean                      # Clean build artifacts"
+    echo "============================================================"
+}
+
 show_menu() {
     print_banner
     echo "Please choose a step or action:"
-    echo "  [C] Config: Configure Active Simulation, Hardware Knobs, Presets, Save/Load"
-    echo "  [1] Step 1: Build Project (Release Mode)"
-    echo "  [2] Step 2: Run Full Test Suite (156+ Unit & Regression Tests)"
-    echo "  [3] Step 3: Run Component Microbenchmarks (uBench)"
-    echo "  [4] Step 4: Run CPU Simulation (reads configs/current.cfg automatically)"
-    echo "  [5] Step 5: Compare Accuracy against gem5 Golden Reference"
-    echo "  [6] Exp:    Run Parameter Experiment vs Baseline on Target ELF"
-    echo "  [7] Sweep:  Run Batch Parameter Sweep on configs/sweep/"
+    echo "  [C] Config:   Configure Active Simulation, Hardware Knobs, Presets, Save/Load"
+    echo "  [B] Baseline: Manage Baseline Reports in reports/default/ (List, Update, Re-anchor)"
+    echo "  [1] Step 1:   Build Project (Release Mode)"
+    echo "  [2] Step 2:   Run Full Test Suite (156+ Unit & Regression Tests)"
+    echo "  [3] Step 3:   Run Component Microbenchmarks (uBench)"
+    echo "  [4] Step 4:   Run CPU Simulation (reads configs/current.cfg automatically)"
+    echo "  [5] Step 5:   Compare Accuracy against gem5 Golden Reference"
+    echo "  [6] Exp:      Run Parameter Experiment vs Baseline on Target ELF"
+    echo "  [7] Sweep:    Run Batch Parameter Sweep on configs/sweep/"
+    echo "  [H] Help:     View Complete Command & Usage Manual"
     echo "  [0] Exit"
     echo "============================================================"
-    read -r -p "Enter choice [C, 1-7, 0]: " choice
+    read -r -p "Enter choice [C, B, 1-7, H, 0]: " choice
     case "${choice}" in
         c|C|config) python3 "${PROJECT_ROOT}/scripts/config.py" ;;
+        b|B|baseline) python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-list ;;
         1) "${PROJECT_ROOT}/scripts/01_build.sh" ;;
         2) "${PROJECT_ROOT}/scripts/02_run_tests.sh" ;;
         3) "${PROJECT_ROOT}/scripts/03_run_ubench.sh" all ;;
@@ -74,6 +109,7 @@ show_menu() {
         5) "${PROJECT_ROOT}/scripts/05_compare_gem5.sh" --all ;;
         6) run_interactive_exp ;;
         7) python3 "${PROJECT_ROOT}/scripts/config.py" sweep ;;
+        h|H|help) show_help ;;
         0|q|Q) echo "Goodbye!"; exit 0 ;;
         *) echo "Invalid option."; exit 1 ;;
     esac
@@ -96,6 +132,24 @@ else
             ;;
         list|ls)
             python3 "${PROJECT_ROOT}/scripts/config.py" list
+            ;;
+        baseline|base)
+            subcmd="$1"
+            shift || true
+            case "${subcmd}" in
+                list|ls|"")
+                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-list
+                    ;;
+                update|up)
+                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-update "$@"
+                    ;;
+                set)
+                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-set "$@"
+                    ;;
+                *)
+                    python3 "${PROJECT_ROOT}/scripts/experiment.py" --baseline-list
+                    ;;
+            esac
             ;;
         1|build)
             "${PROJECT_ROOT}/scripts/01_build.sh" "$@"
@@ -134,25 +188,7 @@ else
             echo "[OK] Cleaned."
             ;;
         -h|--help|help)
-            print_banner
-            echo "Direct CLI Commands:"
-            echo "  ./run.sh                            # Launch Interactive Menu"
-            echo "  ./run.sh edit                       # Open active config in vi directly"
-            echo "  ./run.sh show                       # Display full active microarchitecture dashboard"
-            echo "  ./run.sh list                       # List all presets and snapshots in default/, save/, sweep/"
-            echo "  ./run.sh config [menu|edit|show...] # Launch configuration manager"
-            echo "  ./run.sh build                      # [Step 1] Build simulator and tests"
-            echo "  ./run.sh test                       # [Step 2] Run 156+ unit tests"
-            echo "  ./run.sh ubench [component|all]     # [Step 3] Run microbenchmarks (bpu, exec, rob, cache, all)"
-            echo "  ./run.sh sim [elf] [config]         # [Step 4] Run simulation (zero-args: reads current.cfg)"
-            echo "  ./run.sh gem5 [--all]               # [Step 5] Compare against gem5 golden"
-            echo "  ./run.sh exp                        # Run Interactive Parameter Experiment Wizard"
-            echo "  ./run.sh exp --elf <elf> --set k=v  # Run CLI parameter experiment vs baseline"
-            echo "  ./run.sh sweep                      # Run batch parameter sweep on configs/sweep/"
-            echo "  ./run.sh knobs                      # List all tunable hardware parameters catalog"
-            echo "  ./run.sh elfs                       # List all available test ELF workloads"
-            echo "  ./run.sh clean                      # Clean build directory"
-            echo "============================================================"
+            show_help
             ;;
         *)
             echo "Unknown command: ${COMMAND}"

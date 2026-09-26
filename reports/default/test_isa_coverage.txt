@@ -1,0 +1,106 @@
+================================================================================
+                  TinyCpuSim uArch Simulation Performance Report                
+================================================================================
+  Target Program:        /Users/kuanwei/workspace/TinySim/tests/fixtures/test_isa_coverage.elf
+  Generation Timestamp:  2026-09-26 23:14:36
+  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+--------------------------------------------------------------------------------
+
+TinyCpuSim v0.1.0
+Loading ELF: /Users/kuanwei/workspace/TinySim/tests/fixtures/test_isa_coverage.elf...
+Microarchitecture Simulation Mode ENABLED
+  Cores: 1 | OoO: Yes | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
+Entry Point: 0x10000
+Starting simulation...
+
+============================================================
+SIMULATION PASSED
+Exit Code:          0 (R0 = 0)
+Total Instructions: 268
+Elapsed Time:       0.000054 s
+Simulation Speed:   4928735.63 inst/s (4.93 MIPS)
+============================================================
+
+
+============================================================
+               TinyCpuSim uArch Simulation Report           
+============================================================
+Simulated Target Clock:    1000.00 MHz
+Simulated Target Time:     1.4200e-07 s
+Simulated Total Cycles:    142 ticks
+Total Committed Insts:     268
+Total Committed uOps:      313
+Aggregate Throughput (IPC):1.887 inst/cycle (uOp IPC: 2.204)
+Active Core Count:         1
+------------------------------------------------------------
+[ Host Simulator Performance ]
+  Host Wall-Clock Time:    0.000054 s
+  Simulation Speed:        2.61 M-Ticks/s
+  Simulation MIPS:         4.93 MIPS
+  Simulation Slowdown:     382.9x
+------------------------------------------------------------
+[ Core 0 Summary ]
+  Committed Insts / uOps:  268 / 313 (uOp Ratio: 1.17x)
+  Core Throughput (IPC):   1.887 inst/cycle
+  Branch Predictions:      49 (Accuracy: 85.7%)
+  Branch Mispredicts:      7 (Penalty Flushes: 7)
+  L1I Cache Hit Rate:      98.66% (369/374)
+  L1D Cache Hit Rate:      94.29% (33/35)
+  Loads / Stores:          41 / 21
+  Store-to-Load Forwards:  27 (Rate: 65.85%)
+  Mem Order Violations:    0
+  --- Top-Down Breakdown (Level 1) ---
+    Frontend Bound:        0.00%
+    Bad Speculation:       0.00%
+    Backend Bound:         3.10%
+    Retiring:              96.90%
+  --- Detailed Execution Ports ---
+    Port ALU uOps:         174
+    Port MUL uOps:         0
+    Port DIV uOps:         0
+    Port Branch uOps:      49
+    Port LSU uOps:         108
+  --- Pipeline Stalls Breakdown ---
+    ROB Full Stalls:       10 cycles
+    RS/IQ Full Stalls:     0 cycles
+    PRF Exhaustion Stalls: 0 cycles
+    LQ / SQ Full Stalls:   0 / 0 cycles
+    Head-of-ROB Stalls:    0 cycles
+  --- Branch Predictor Diagnostics ---
+    Direct Cond / Uncond:  24 / 13
+    Calls / Returns:       6 / 6
+    Indirect Branches:     0
+    BTB Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    RAS Pushes / Pops:     0 / 0
+    TAGE Provider Hits:    0
+  --- LSU & Memory Disambiguation ---
+    Store-to-Load Forwards:27
+    Store Data Replays:    0
+    Memory Order Flushes:  0
+  --- Cache & MSHR Subsystem ---
+    L1I Misses / Evictions:5 / 0
+    L1D Misses / Evictions:2 / 0
+    L1D Dirty Writebacks:  0
+    L1D MSHR Allocations:  0 (Stalls: 0)
+  --- Top-Down Breakdown (Level 2) ---
+    Retiring Base ALU:     230 slots
+    Retiring Mem:          83 slots
+    FE L1I Miss:           0 slots
+    FE Fetch Bubbles:      0 slots
+    BE Core RS Full:       0 slots
+    BE Core ROB Full:      10 slots
+    BE Core FreeList Empty:0 slots
+    BE Mem L1D Miss:       0 slots
+    BE Mem MSHR Full:      0 slots
+    BE Mem L2 Miss:        0 slots
+    BE Mem StoreBuf Full:  0 slots
+------------------------------------------------------------
+[ Shared L2 Cache & Coherence ]
+  L2 Accesses:             0
+  L2 Hits / Misses:        0 / 0 (Hit Rate: 0.00%)
+  L2 Evictions / WB:       0 / 0
+  MESI Snoop Broadcasts:   0
+  MESI Line Invalidations: 0
+============================================================
+
