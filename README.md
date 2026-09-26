@@ -7,7 +7,7 @@
 
 **TinyCpuSim** is a high-performance, cycle-accurate Out-of-Order (OoO) superscalar CPU simulator and functional ISA emulator for ARMv7-M (Thumb-2) written in modern C++17.
 
-TinyCpuSim provides an end-to-end simulation environment featuring an advanced Tomasulo/ROB microarchitecture, non-blocking multi-level cache hierarchy with MESI coherence, Intel/ARM Top-Down microarchitecture analysis (TMAM), comprehensive 40+ hardware performance counters, dynamic Region of Interest (ROI) profiling via `m5ops`, and automated golden accuracy calibration against **gem5**.
+TinyCpuSim provides an end-to-end microarchitectural exploration platform featuring an advanced Tomasulo/ROB execution engine, non-blocking multi-level cache hierarchy with MESI multi-core coherence, Intel/ARM Top-Down microarchitecture analysis (TMAM), 40+ cycle-accurate hardware performance counters, dynamic Region of Interest (ROI) profiling via `m5ops`, and automated golden accuracy calibration against **gem5**.
 
 ---
 
@@ -15,16 +15,16 @@ TinyCpuSim provides an end-to-end simulation environment featuring an advanced T
 
 - [Key Architectural Features](#key-architectural-features)
 - [System Requirements & Prerequisites](#system-requirements--prerequisites)
-- [Quickstart Guide (1-Click Workflow)](#quickstart-guide-1-click-workflow)
+- [Quickstart & Unified Interface (`run.sh`)](#quickstart--unified-interface-runsh)
+- [Configuration Lifecycle Management (`config.py`)](#configuration-lifecycle-management-configpy)
+- [Microarchitectural Experiment Engine (`experiment.py`)](#microarchitectural-experiment-engine-experimentpy)
 - [Sequential 5-Step Workflow Guide](#sequential-5-step-workflow-guide)
-  - [Step 1: Building the Simulator (`01_build.sh`)](#step-1-building-the-simulator-01_buildsh)
+  - [Step 1: Building Simulator & Tests (`01_build.sh`)](#step-1-building-simulator--tests-01_buildsh)
   - [Step 2: Full Unit & Regression Tests (`02_run_tests.sh`)](#step-2-full-unit--regression-tests-02_run_testssh)
-  - [Step 3: Component Microbenchmarks & Sweeps (`03_run_ubench.sh`)](#step-3-component-microbenchmarks--sweeps-03_run_ubenchsh)
-  - [Step 4: Full-System Simulation & Custom Configs (`04_run_simulation.sh`)](#step-4-full-system-simulation--custom-configs-04_run_simulationsh)
+  - [Step 3: Component Microbenchmarks (`03_run_ubench.sh`)](#step-3-component-microbenchmarks-03_run_ubenchsh)
+  - [Step 4: Full CPU Simulation (`04_run_simulation.sh`)](#step-4-full-cpu-simulation-04_run_simulationsh)
   - [Step 5: gem5 Golden Reference Accuracy Comparison (`05_compare_gem5.sh`)](#step-5-gem5-golden-reference-accuracy-comparison-05_compare_gem5sh)
-- [Hardware Performance Counters & Diagnostics (`--all-perf`)](#hardware-performance-counters--diagnostics---all-perf)
-- [Microarchitecture Parameter Sweeps (`sweep_parameters.py`)](#microarchitecture-parameter-sweeps-sweep_parameterspy)
-- [Microarchitecture Configuration Presets](#microarchitecture-configuration-presets)
+- [Hardware Performance Counters & TMAM Breakdown](#hardware-performance-counters--tmam-breakdown)
 - [Project Directory Structure](#project-directory-structure)
 - [License](#license)
 
@@ -35,12 +35,13 @@ TinyCpuSim provides an end-to-end simulation environment featuring an advanced T
 - **ARMv7-M / Thumb-2 ISA Engine**:
   - Full Thumb-16 and Thumb-32 instruction decoding and emulation.
   - Complete arithmetic, logical, multiply/divide, load/store, branch, conditional execution (IT blocks), and stack operations.
-  - ELF loader with bare-metal memory space mapping and register initialization.
+  - Bare-metal ELF loader with memory space mapping and register initialization.
 
 - **Superscalar Out-of-Order Core**:
-  - **Branch Prediction Unit (BPU)**: Tournament Predictor, TAGE, Return Address Stack (RAS), and Branch Target Buffer (BTB).
+  - **Branch Prediction Unit (BPU)**: Tournament Predictor, TAGE, GShare, Bimodal, Return Address Stack (RAS), and Branch Target Buffer (BTB).
   - **Frontend & Renaming**: Configurable N-wide superscalar Fetch/Decode/Rename with Physical Register File (PRF), Free Lists, and Speculative RAT checkpoints.
   - **Age-Ordered Unified Issue Queue**: Priority-based scheduling (oldest instruction first) resolving structural and data hazards.
+  - **Dual Execution Engine**: Full Tomasulo dynamic Out-of-Order scheduling or strict In-Order serialized stall execution (`enable_ooo = false`).
   - **Pipelined Execution Units**: Pipelined ALUs, Multipliers, Dividers, and Branch Resolution Units.
   - **Load/Store Unit (LSU)**: Load-Store Queue (LSQ) supporting store-to-load forwarding, speculative load bypass, and memory order violation detection.
   - **Reorder Buffer (ROB)**: In-order retirement supporting precise exception recovery and macro-instruction retirement tracking.
@@ -50,7 +51,7 @@ TinyCpuSim provides an end-to-end simulation environment featuring an advanced T
   - Shared L2 Cache with LRU replacement policy and dirty write-back eviction.
   - MESI Cache Coherence state machine for multi-core simulation.
 
-- **Comprehensive 40+ Hardware Performance Counters & TMAM**:
+- **40+ Hardware Performance Counters & TMAM**:
   - Full execution port utilization, stall cycles, branch diagnostics, LSU forwarding rates, and cache/MSHR counters.
   - Cycle-accurate Top-Down slot accounting (Level 1 & Level 2 breakdown).
   - Dynamic Region of Interest (ROI) statistics collection via `m5_reset_stats()` and `m5_dump_stats()`.
@@ -59,49 +60,187 @@ TinyCpuSim provides an end-to-end simulation environment featuring an advanced T
 
 ## System Requirements & Prerequisites
 
-TinyCpuSim has minimal dependencies and runs seamlessly on macOS and Linux.
+TinyCpuSim has minimal external dependencies and runs on macOS and Linux.
 
 - **Operating System**: macOS (Apple Silicon / Intel) or Linux (Ubuntu 20.04+, Debian, Fedora, Arch).
 - **C++ Compiler**: Clang (`clang++ >= 11` / Apple Clang 13+) or GCC (`g++ >= 9`) with C++17 support.
 - **Build System**: CMake `>= 3.15` and Make or Ninja.
-- **Python**: Python 3.8+ (used for parameter sweeps and gem5 regression).
+- **Python**: Python 3.8+ (used for parameter experiments, TUI configuration, and gem5 regression).
 
 ---
 
-## Quickstart Guide (1-Click Workflow)
+## Quickstart & Unified Interface (`run.sh`)
 
-Anyone cloning the repository can immediately run the unified interactive menu or direct shortcuts:
+TinyCpuSim provides a single unified entry point: [`run.sh`](run.sh).
 
+### Interactive Menu
+
+Launch the interactive text user interface:
 ```bash
-# 1. Clone the repository
-git clone git@github.com:Kuanwei1225/TinyCpuSim.git
-cd TinyCpuSim
-
-# 2. Launch the interactive manager
 ./run.sh
 ```
 
-Or run direct shortcuts:
+```text
+============================================================
+              TinyCpuSim - Master Control Center            
+============================================================
+Please choose a step or action:
+  [C] Config:   Configure Active Simulation, Hardware Knobs, Presets, Save/Load
+  [1] Step 1:   Build Project (Release Mode)
+  [2] Step 2:   Run Full Test Suite (156+ Unit & Regression Tests)
+  [3] Step 3:   Run Component Microbenchmarks (uBench)
+  [4] Step 4:   Run CPU Simulation (reads configs/current.cfg automatically)
+  [5] Step 5:   Compare Accuracy against gem5 Golden Reference
+  [6] Exp:      Run Experiment on Active Config vs Baseline
+  [7] Sweep:    Run Batch Parameter Sweep on configs/sweep/
+  [H] Help:     View Complete Command & Usage Manual
+  [0] Exit
+============================================================
+```
+
+### Direct CLI Commands
+
 ```bash
-./run.sh build                  # [Step 1] Build simulator and all tests
-./run.sh test                   # [Step 2] Run 156+ unit & regression tests
-./run.sh ubench all             # [Step 3] Run isolated microbenchmarks
-./run.sh sim tests/fixtures/test_fibonacci.elf --all-perf   # [Step 4] Run full simulation
-./run.sh gem5 --all             # [Step 5] Compare against gem5 golden
-./run.sh sweep --param=rob_size # Run automated parameter sweep
+# Workflow Steps
+./run.sh build                      # [Step 1] Build simulator (Release mode)
+./run.sh test                       # [Step 2] Run 156+ unit & regression tests
+./run.sh ubench [bpu|exec|rob|cache|all] # [Step 3] Run component microbenchmarks
+./run.sh sim [elf] [config]         # [Step 4] Run simulation (zero-args reads current.cfg)
+./run.sh gem5 [--all]               # [Step 5] Compare accuracy vs gem5 golden
+
+# Configuration & Editing
+./run.sh edit                       # Direct vi editing of active configs/current.cfg
+./run.sh show                       # Display full active microarchitecture dashboard
+./run.sh list                       # List all presets and snapshots in default/, save/, sweep/
+./run.sh config                     # Launch interactive configuration manager TUI
+
+# Microarchitectural Experiments
+./run.sh exp                        # Run experiment on active config (current.cfg) vs baseline
+./run.sh exp [elf]                  # Run experiment on target ELF using active config
+./run.sh exp --set k=v              # Run experiment with hardware overrides (e.g. ooo=false)
+./run.sh sweep                      # Run batch parameter sweep on configs/sweep/
+
+# Catalogs & Utilities
+./run.sh knobs                      # List all tunable hardware parameters & units
+./run.sh elfs                       # List all built-in benchmark ELF workloads
+./run.sh clean                      # Clean build artifacts
+./run.sh help                       # View complete CLI manual
+```
+
+---
+
+## Configuration Lifecycle Management (`config.py`)
+
+Configuration management is organized into a clean 3-repository model under `configs/`:
+
+```text
+configs/
+├── current.cfg         # Active simulation configuration
+├── default/            # Immutable baseline presets (default.cfg, multicore.cfg)
+├── save/               # User custom snapshots (e.g. my_wide_core.cfg)
+└── sweep/              # Batch parameter sweep configurations
+```
+
+### Key Capabilities:
+- **Direct Editor Integration**: Edit the active configuration directly using `vi` via `./run.sh edit`.
+- **Human-Readable Unit Conversion**: Write cache sizes as `32KB`, `512KB`, or `1MB`. Values are validated and automatically converted to power-of-2 integer bytes upon saving while preserving all comments.
+- **Microarchitecture Dashboard**: Run `./run.sh show` to inspect all 6 hardware subsystems:
+  1. Target Workload
+  2. Multicore / MESI Coherence / DRAM Latency
+  3. Superscalar Pipeline & Out-of-Order Tomasulo Engine
+  4. Branch Prediction Unit (TAGE / BTB / RAS)
+  5. Load/Store Unit & Memory Disambiguation
+  6. Multi-Level Cache Hierarchy (L1I, L1D, Shared L2, MSHRs)
+
+---
+
+## Microarchitectural Experiment Engine (`experiment.py`)
+
+TinyCpuSim features a zero-prompt experiment comparison engine (`./run.sh exp`).
+
+### How It Works:
+1. **Decodes Target ELF**: Resolves the workload from CLI arguments (e.g. `./run.sh exp test_sort.elf`) or directly from `[workload] elf_path` inside `configs/current.cfg`.
+2. **Auto-Resolves Baseline**: Checks `reports/default/<elf>.txt` for a cached baseline report.
+3. **Deltas & Diagnosis**: Compares the active configuration against the baseline, producing a 5-panel structured comparison report with an automated architectural root-cause diagnosis.
+4. **Missing Baseline Handling**: If no baseline report is found, it runs the simulation, prints the full performance report, and outputs the exact command to establish it as baseline:
+   ```bash
+   cp reports/exp_<elf>_<timestamp>.txt reports/default/<elf>.txt
+   ```
+
+### Example Comparison Report:
+```text
+====================================================================================
+       TinyCpuSim Microarchitectural Experiment Report: [test_fibonacci.elf]
+====================================================================================
+  Target Program:        /Users/.../tests/fixtures/test_fibonacci.elf
+  Baseline Report:       /Users/.../reports/default/test_fibonacci.txt
+  Applied Configuration: /Users/.../configs/current.cfg
+------------------------------------------------------------------------------------
+  Active Hardware Parameter Modifications (vs Baseline):
+    • [core] issue_width: 4  -->  2
+------------------------------------------------------------------------------------
+  Executive Impact: SLOWDOWN: 1.21x (17.5% slower) | Baseline IPC: 0.801 -> Exp IPC: 0.661
+------------------------------------------------------------------------------------
+  1. Overall Core Performance        | Baseline      | Experiment    | Delta (%)   
+  --------------------------------------------------------------------------------
+  Simulated Total Cycles             | 2132          | 2584          | +21.20%
+  Throughput (IPC)                   | 0.80          | 0.66          | -17.48%
+  uOp Throughput (uOp IPC)           | 1.55          | 1.28          | -17.51%
+  Committed Instructions             | 1708          | 1708          | 0.0%        
+  Committed uOps                     | 3301          | 3301          | 0.0%        
+
+  --------------------------------------------------------------------------------
+  2. Top-Down TMAM Breakdown         | Baseline      | Experiment    | Delta (%)   
+  --------------------------------------------------------------------------------
+  Retiring (Useful Work)             | 100.00%       | 90.39%        | -9.61%
+  Bad Speculation (Squashed)         | 0.00%         | 0.00%         | ---         
+  Front-End Bound (Fetch/BTB)        | 0.00%         | 0.00%         | ---         
+  Back-End Bound (Stalls)            | 0.00%         | 9.61%         | +9.61
+
+  --------------------------------------------------------------------------------
+  3. Pipeline Stalls & Hazards       | Baseline      | Experiment    | Delta (%)   
+  --------------------------------------------------------------------------------
+  Issue Queue (RS) Full Stalls       | 0 cyc         | 351 cyc       | +351
+  ROB Full Stalls                    | 0 cyc         | 0 cyc         | ---         
+  PRF FreeList Exhaustion Stalls     | 0 cyc         | 0 cyc         | ---         
+  LQ / SQ Full Stalls                | 0 cyc         | 0 cyc         | ---         
+  Head-of-ROB Stalls                 | 0 cyc         | 0 cyc         | ---         
+
+  --------------------------------------------------------------------------------
+  4. Branch Predictor & Control      | Baseline      | Experiment    | Delta (%)   
+  --------------------------------------------------------------------------------
+  Branch Predictor Accuracy          | 74.20%        | 74.90%        | +0.94%
+  Branch Mispredict Penalty Flushes  | 235           | 210           | -10.64%
+  BTB Target Hit Rate                | 0.00%         | 0.00%         | ---         
+  RAS Return Hit Rate                | 0.00%         | 0.00%         | ---         
+
+  --------------------------------------------------------------------------------
+  5. Memory & Cache Subsystem        | Baseline      | Experiment    | Delta (%)   
+  --------------------------------------------------------------------------------
+  L1I Cache Hit Rate                 | 99.96%        | 99.97%        | +0.01%
+  L1D Cache Hit Rate                 | 99.64%        | 99.62%        | -0.02%
+  Shared L2 Cache Hit Rate           | 0.00%         | 0.00%         | ---         
+  Store-to-Load Bypass Rate          | 8.52%         | 0.00%         | -100.00%
+  L1D MSHR Saturation Stalls         | 0             | 0             | ---         
+
+====================================================================================
+  🔍 Automated Architectural Diagnosis & Key Takeaways:
+  • Performance Degradation: Execution took 21.2% more cycles, IPC dropped by -17.5%.
+  • Issue Queue Bottleneck: Issue Queue / RS stalls increased by +351 cycles.
+  • Branch Improvement: Eliminated 25 branch mispredict flushes.
+====================================================================================
+  Experiment performance report saved to: reports/exp_test_fibonacci_20260926_233010.txt
 ```
 
 ---
 
 ## Sequential 5-Step Workflow Guide
 
-For step-by-step sequential execution, simply follow the numbered scripts in order:
-
-### Step 1: Building the Simulator (`01_build.sh`)
+### Step 1: Building Simulator & Tests (`01_build.sh`)
 ```bash
 ./scripts/01_build.sh
 ```
-Automatically detects system CPU cores, configures CMake Release mode, and builds the `tinycpusim` binary alongside all 156+ test executables.
+Automatically detects system CPU cores, configures CMake in Release mode, and builds `build/tinycpusim` alongside all test binaries.
 
 ---
 
@@ -109,74 +248,46 @@ Automatically detects system CPU cores, configures CMake Release mode, and build
 ```bash
 ./scripts/02_run_tests.sh
 ```
-Executes all 156 unit and microarchitecture test cases with 100% pass guarantee.
+Runs all 156 unit and regression tests with a 100% pass guarantee.
 
 ---
 
-### Step 3: Component Microbenchmarks & Sweeps (`03_run_ubench.sh`)
-
-When developing, refactoring, or optimizing individual processor submodules, execute isolated microbenchmarks:
-
+### Step 3: Component Microbenchmarks (`03_run_ubench.sh`)
 ```bash
-# Run all 35 microbenchmark cases
+# Run all isolated component microbenchmarks
 ./scripts/03_run_ubench.sh all
 
-# Test Branch Predictor & Frontend (12 tests)
-./scripts/03_run_ubench.sh bpu
-
-# Test Execution Engine & LSU / Forwarding (12 tests)
-./scripts/03_run_ubench.sh exec
-
-# Test ROB & Top-Down Profiler (11 tests)
-./scripts/03_run_ubench.sh rob
-
-# Test Cache Hierarchy, MSHR & MESI Coherence (6 tests)
-./scripts/03_run_ubench.sh cache
-
-# Filter specific corner case
-./scripts/03_run_ubench.sh exec --gtest_filter=*ExactStoreToLoadForwarding*
+# Target specific subsystems
+./scripts/03_run_ubench.sh bpu     # Branch Predictor & Frontend
+./scripts/03_run_ubench.sh exec    # Execution Engine & LSU Forwarding
+./scripts/03_run_ubench.sh rob     # Reorder Buffer & Top-Down Profiler
+./scripts/03_run_ubench.sh cache   # Non-blocking Caches & MESI Coherence
 ```
 
 ---
 
-### Step 4: Full-System Simulation & Custom Configs (`04_run_simulation.sh`)
-
-Run bare-metal ARM ELF programs on the cycle-accurate Out-of-Order processor:
-
+### Step 4: Full CPU Simulation (`04_run_simulation.sh`)
 ```bash
-# Basic run with default OoO configuration (Medium)
+# Run simulation using active configs/current.cfg
+./scripts/04_run_simulation.sh
+
+# Run specific ELF workload
 ./scripts/04_run_simulation.sh tests/fixtures/test_fibonacci.elf
-
-# Run with full 40+ hardware performance counters displayed
-./scripts/04_run_simulation.sh tests/fixtures/test_fibonacci.elf --all-perf
-
-# Run with custom microarchitecture config (e.g. 8-wide core)
-./scripts/04_run_simulation.sh tests/fixtures/test_stress.elf configs/ooo_wide.cfg --all-perf
-
-# Run pure functional ISA simulation
-./scripts/04_run_simulation.sh tests/fixtures/test_arithmetic.elf --isa-only
 ```
-> **Note**: Every simulation run automatically saves a full timestamped performance report to the `reports/` folder (e.g. `reports/test_fibonacci_20260926_214831.txt`).
 
 ---
 
 ### Step 5: gem5 Golden Reference Accuracy Comparison (`05_compare_gem5.sh`)
-
-Compare TinyCpuSim's execution statistics against the cycle-accurate **gem5** golden reference:
-
 ```bash
-# Run batch regression across all 9 benchmark suites
+# Run batch accuracy regression across all benchmarks
 ./scripts/05_compare_gem5.sh --all
-
-# Compare single benchmark
-./scripts/05_compare_gem5.sh --case=test_fibonacci
 ```
 
 ---
 
-## Hardware Performance Counters & Diagnostics (`--all-perf`)
+## Hardware Performance Counters & TMAM Breakdown
 
-Running with `--all-perf` (or `-v`) outputs all 40+ hardware counters across all processor stages:
+Simulating with `--all-perf` outputs complete hardware statistics:
 
 ```text
 ============================================================
@@ -235,178 +346,38 @@ Aggregate Throughput (IPC):0.801 inst/cycle (uOp IPC: 1.548)
 
 ---
 
-## Target Program Hardware Parameter Exploration (`experiment.py`)
-
-TinyCpuSim provides an experiment and knob-tuning utility (`scripts/experiment.py`) allowing you to inspect, modify, and compare microarchitectural parameters for **one specific program** or **a selected group of programs** with an automated side-by-side baseline delta report.
-
----
-
-### 1. Listing All Tunable Hardware Parameters (Knobs)
-
-To display all available parameters across all pipeline and memory stages:
-```bash
-./run.sh knobs
-# Or directly:
-python3 scripts/experiment.py --list-params
-```
-
-#### Tunable Parameters Summary:
-| Section | Parameter / Knob | Aliases | Default | Description |
-|:---|:---|:---|:---:|:---|
-| `[core]` | `issue_width`, `fetch_width`, `commit_width` | `width` | 4 | Superscalar pipeline width per cycle |
-| `[core]` | `rob_size` | `rob` | 64 | Reorder Buffer (ROB) capacity entries |
-| `[core]` | `rs_size` | `iq`, `rs` | 32 | Issue Queue / Reservation Station capacity |
-| `[core]` | `num_phys_regs` | `prf` | 128 | Physical Register File (PRF) total registers |
-| `[branch_predictor]` | `type` | `bp`, `bpu` | TAGE | Direction Predictor (`IDEAL`, `BIMODAL`, `GSHARE`, `TAGE`) |
-| `[branch_predictor]` | `table_size`, `btb_size`, `ras_size` | `btb`, `ras` | 4096 / 32 | History table, BTB entries, and RAS stack depth |
-| `[lsu]` | `lq_size`, `sq_size` | `lq`, `sq` | 16 / 16 | Load Queue & Store Queue capacities |
-| `[lsu]` | `enable_store_forwarding` | `store_forward` | true | Enable 0-cycle store-to-load queue bypass |
-| `[cache_l1i]` | `size_bytes`, `associativity` | `l1i_size` | 32KB / 4-way | L1 Instruction Cache capacity & associativity |
-| `[cache_l1d]` | `size_bytes`, `associativity` | `l1d_size` | 32KB / 4-way | L1 Data Cache capacity & associativity |
-| `[cache_l2]` | `size_bytes`, `associativity` | `l2_size` | 512KB / 8-way | Shared L2 Cache capacity & associativity |
-| `[system]` | `dram_latency_cycles` | `dram_latency` | 80 | Main memory DRAM access latency in cycles |
-
----
-
-### 2. Listing Available Workload Programs (ELFs)
-
-```bash
-./run.sh elfs
-# Or directly:
-python3 scripts/experiment.py --list-elfs
-```
-
----
-
-### 3. Running Single-Program Parameter Experiments
-
-Evaluate the exact performance impact when modifying parameters on a target program:
-
-```bash
-# Test the impact of shrinking ROB size to 16 on Fibonacci
-python3 scripts/experiment.py --elf test_fibonacci.elf --set rob=16
-
-# Test the impact of widening issue width to 8-way with TAGE on Sorting
-python3 scripts/experiment.py --elf test_sort.elf --set width=8 --set bp=TAGE
-
-# Test disabling Store-to-Load Forwarding on Store-Forward benchmark
-python3 scripts/experiment.py --elf test_store_forward.elf --set store_forward=false
-```
-
-#### Example Comparison Report Output:
-```text
-==============================================================================
-       Experiment Comparison Report: [test_fibonacci.elf]
-==============================================================================
-  Active Hardware Parameter Modifications:
-    - [core] rob_size: default  -->  16
-------------------------------------------------------------------------------
-  Hardware Metric                | Baseline     | Experiment   | Delta (%)   
-  --------------------------------------------------------------------------
-  Simulated Total Cycles         | 2132         | 2262         | +6.10%      
-  Committed Instructions         | 1708         | 1708         | 0.0%        
-  Throughput (IPC)               | 0.801        | 0.755        | -5.74%      
-  Branch Predictor Accuracy      | 74.2%        | 73.7%        | -0.67%      
-  Store-to-Load Forwards         | 54           | 4            | -92.59%     
-  ROB Full Stalls                | 0 cycles     | 932 cycles   | ---         
-  TMAM Backend Bound             | 0.0%         | 22.02%       | ---         
-  TMAM Retiring                  | 100.0%       | 77.98%       | -22.02%     
-==============================================================================
-```
-
----
-
-### 4. Running Multi-Program Evaluation Under Identical Hardware Changes
-
-Evaluate multiple programs simultaneously to observe workload-dependent trends:
-
-```bash
-# Evaluate Width=8-way across Fibonacci, Sort, and Stress loop
-python3 scripts/experiment.py --elf test_fibonacci,test_sort,test_stress --set width=8
-```
-
----
-
-## Microarchitecture Parameter Sweeps (`sweep_parameters.py`)
-
-Explore the design space by sweeping hardware parameters across target programs:
-
-```bash
-# Sweep Reorder Buffer (ROB) size (16, 32, 64, 128, 256)
-python3 scripts/sweep_parameters.py --elf tests/fixtures/test_fibonacci.elf --param rob_size
-
-# Sweep Issue Width (1-way, 2-way, 4-way, 8-way)
-python3 scripts/sweep_parameters.py --elf tests/fixtures/test_stress.elf --param issue_width
-
-# Sweep L1 Data Cache Size (8KB, 16KB, 32KB, 64KB)
-python3 scripts/sweep_parameters.py --elf tests/fixtures/test_mem_stride.elf --param l1d_size
-
-# Sweep Branch Predictor Algorithm (BIMODAL, GSHARE, TAGE)
-python3 scripts/sweep_parameters.py --elf tests/fixtures/test_branch_pred.elf --param bp_type
-```
-
-#### Example Sweep Output:
-```text
-===========================================================================
-  TinyCpuSim Parameter Sweep: [issue_width] on test_stress.elf
-  Base Config: ooo_medium.cfg
-===========================================================================
-Configuration      | Cycles     | IPC      | Branch Acc   | L1D Hit Rate
----------------------------------------------------------------------------
-Width=1-way        | 130029     | 0.923    | 100.0%       | 100.0%      
-Width=2-way        | 80019      | 1.500    | 100.0%       | 100.0%      
-Width=4-way        | 80013      | 1.500    | 100.0%       | 100.0%      
-Width=8-way        | 80012      | 1.500    | 100.0%       | 100.0%      
-===========================================================================
-```
-
----
-
-## Microarchitecture Configuration Presets
-
-Configuration files in `configs/` allow customization of core and cache hierarchy parameters:
-
-| Parameter | `ooo_narrow.cfg` | `ooo_medium.cfg` (Default) | `ooo_wide.cfg` |
-|:---|:---:|:---:|:---:|
-| **Fetch / Decode / Commit Width** | 2 | 4 | 8 |
-| **Issue Queue Capacity** | 16 | 32 | 64 |
-| **Reorder Buffer (ROB) Entries** | 32 | 64 | 128 |
-| **Physical Registers (PRF)** | 48 | 96 | 192 |
-| **Load / Store Queue (LSQ)** | 8 / 8 | 16 / 16 | 32 / 32 |
-| **L1I / L1D Cache Size** | 16 KB (2-way) | 32 KB (4-way) | 64 KB (8-way) |
-| **Shared L2 Cache Size** | 128 KB (4-way) | 256 KB (8-way) | 512 KB (16-way) |
-
----
-
 ## Project Directory Structure
 
 ```text
-TinyCpuSim/
+TinySim/
 ├── CMakeLists.txt            # Main CMake build configuration
 ├── README.md                 # Complete documentation & usage guide
-├── run.sh                    # Top-level unified launcher & workflow manager
-├── configs/                  # Microarchitecture configuration presets
-│   ├── ooo_narrow.cfg
-│   ├── ooo_medium.cfg
-│   └── ooo_wide.cfg
-├── include/tinyarmsim/       # Public headers
+├── run.sh                    # Unified launcher & workflow manager
+├── configs/                  # Microarchitecture configurations
+│   ├── current.cfg           # Active simulation configuration
+│   ├── default/              # Baseline templates (default.cfg, multicore.cfg)
+│   ├── save/                 # Custom saved snapshot configs
+│   └── sweep/                # Parameter sweep configs
+├── include/tinyarmsim/       # Public C++ headers
 │   ├── isa/                  # ISA decoder, instruction definitions, register state
-│   ├── memory/               # Memory system, non-blocking caches, MESI coherence
+│   ├── memory/               # Memory bus, non-blocking caches, MESI coherence
 │   └── uarch/                # OoO pipeline: BPU, Frontend, PRF, Issue, Exec, LSU, ROB, TMAM
 ├── src/                      # Source implementations
 │   ├── main.cpp              # CLI driver with --uarch, --all-perf, and options
 │   ├── isa/                  # ISA simulation & disassembler
 │   ├── memory/               # Memory bus & cache controller
 │   └── uarch/                # Cycle-accurate OoO pipeline stages
-├── scripts/                  # Step-by-step workflow scripts
+├── scripts/                  # Workflow scripts & Python tools
 │   ├── 01_build.sh           # Step 1: 1-click build script
 │   ├── 02_run_tests.sh       # Step 2: Full test suite runner (156 tests)
 │   ├── 03_run_ubench.sh      # Step 3: Component microbenchmark runner
 │   ├── 04_run_simulation.sh  # Step 4: Full-system simulation runner
 │   ├── 05_compare_gem5.sh    # Step 5: gem5 golden comparison tool
-│   ├── sweep_parameters.py   # Hardware parameter sweep utility
+│   ├── config.py             # Configuration lifecycle manager & TUI
+│   ├── experiment.py         # Microarchitectural experiment engine & comparison
 │   └── compare_with_gem5.py  # gem5 accuracy comparator
-├── reports/                  # Automatically saved simulation performance logs
+├── reports/                  # Generated experiment & simulation reports
+│   └── default/              # Cached default baseline reports for test ELFs
 └── tests/                    # Tests and benchmarks
     ├── fixtures/             # Bare-metal ELF binaries & assembly sources
     ├── golden/gem5/          # gem5 reference statistics logs
