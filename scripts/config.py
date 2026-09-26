@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #!/usr/bin/env python3
 """
 TinyCpuSim Comprehensive Configuration Lifecycle Manager (scripts/config.py)
