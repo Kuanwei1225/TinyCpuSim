@@ -387,6 +387,12 @@ def main():
     # show
     subparsers.add_parser("show", help="Display the active configuration table")
 
+    # set
+    set_parser = subparsers.add_parser("set", help="Set a configuration key (e.g. set core issue_width 8)")
+    set_parser.add_argument("section", help="INI Section (e.g. core, branch_predictor, cache_l1d)")
+    set_parser.add_argument("key", help="Configuration key name")
+    set_parser.add_argument("value", help="Value to assign")
+
     # save
     save_parser = subparsers.add_parser("save", help="Save active configuration to configs/save/<name>.cfg")
     save_parser.add_argument("name", help="Snapshot filename")
@@ -423,6 +429,17 @@ def main():
 
     elif args.command == "show":
         show_config(CURRENT_CFG, f"Active ({CURRENT_CFG})")
+
+    elif args.command == "set":
+        cfg = configparser.ConfigParser(strict=False, inline_comment_prefixes=('#', ';'))
+        cfg.read(CURRENT_CFG)
+        if not cfg.has_section(args.section):
+            cfg.add_section(args.section)
+        cfg.set(args.section, args.key, args.value)
+        with open(CURRENT_CFG, 'w') as fp:
+            cfg.write(fp)
+        print(f"Updated [{args.section}] {args.key} = {args.value} in {CURRENT_CFG}")
+        print_validation_status(CURRENT_CFG)
 
     elif args.command == "save":
         name = args.name

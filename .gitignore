@@ -73,6 +73,9 @@ uarch_stats.txt
 cov.csv
 m5out/
 reports/*.txt
+reports/ubench/*.txt
 !reports/.gitkeep
+!reports/ubench/default/
+!reports/ubench/default/*.txt
 
 

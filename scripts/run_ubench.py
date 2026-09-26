@@ -218,9 +218,9 @@ def format_suite_report_file(suite_res, active_cfg, changed_knobs, base_stats=No
         f"  Test Pass Count:       {suite_res['passed']} / {suite_res['total']}",
     ]
     if changed_knobs:
-        lines.append("  Active Hardware Parameter Modifications:")
+        lines.append("  Active Hardware Parameter Modifications (vs Baseline):")
         for sec, k, v_b, v_a in changed_knobs:
-            lines.append(f"    • [{sec}] {k}: {v_b} --> {v_a}")
+            lines.append(f"    • [{sec}] {k}: Baseline ({v_b}) ➔ Active ({v_a})")
     lines.append("--------------------------------------------------------------------------------")
     lines.append("  Top Microarchitecture Hardware Metrics:")
     for k, v in suite_res['sim_stats'].items():
@@ -297,7 +297,9 @@ def main():
     if changed_knobs:
         print("  Active Hardware Parameter Modifications (vs Baseline):")
         for sec, k, v_b, v_a in changed_knobs:
-            print(f"    • [{sec}] {k}: {v_b}  -->  \033[1;32m{v_a}\033[0m")
+            matched_suites = [s['name'] for s in UBENCH_SUITES.values() if k in s['sensitive_knobs']]
+            target_scope = f"  \033[2m[Affects: {', '.join(matched_suites)}]\033[0m" if matched_suites else ""
+            print(f"    • [{sec}] {k}: Baseline ({v_b}) ➔ Active Run (\033[1;32m{v_a}\033[0m){target_scope}")
     else:
         print("  Active Hardware Parameters: (Matches Baseline Default Configuration)")
     print("-" * 88)
@@ -339,9 +341,9 @@ def main():
             c_e = sim_stats['cycles']
             speedup_factor = float(c_b) / float(c_e)
             delta_pct = ((c_e - c_b) / float(c_b)) * 100.0
-            if delta_pct < 0:
+            if delta_pct < -0.01:
                 delta_tag = f" | Baseline Delta: \033[1;32m{abs(delta_pct):.1f}% FASTER (Speedup: {speedup_factor:.2f}x)\033[0m"
-            elif delta_pct > 0:
+            elif delta_pct > 0.01:
                 delta_tag = f" | Baseline Delta: \033[1;31m+{delta_pct:.1f}% SLOWER (Slowdown: {(1.0/speedup_factor):.2f}x)\033[0m"
             else:
                 delta_tag = " | Baseline Delta: 0.0%"
@@ -363,20 +365,13 @@ def main():
             print(f"    {idx}. \033[1m{t_name}\033[0m: {m_label} = \033[1;31m{m_val}{m_unit}\033[0m ({t_desc})")
 
     # =========================================================================
-    # Global Sensitivity & Architectural Attribution Analysis
+    # Global Sensitivity & Cross-Suite Performance Impact Summary
     # =========================================================================
     print("\n" + "=" * 88)
-    print("  📊 HARDWARE CONFIGURATION SENSITIVITY & IMPACT SUMMARY:")
+    print("  📊 CROSS-SUITE PERFORMANCE IMPACT & ATTRIBUTION RANKING:")
     print("=" * 88)
 
     if changed_knobs:
-        print("  Evaluated Config Modifications vs Workload Impact:")
-        for sec, k, v_b, v_a in changed_knobs:
-            matched_suites = [s['name'] for s in all_results if k in s['sensitive_knobs']]
-            target_scope = ", ".join(matched_suites) if matched_suites else "General Pipeline / All Suites"
-            print(f"  • Knob: \033[1;36m[{sec}] {k} = {v_a}\033[0m (Default: {v_b})")
-            print(f"    Affected Subsystem Scope: \033[1m{target_scope}\033[0m")
-
         # Rank which workload had best speedup and which had worst regression
         ranked_suites = []
         for s in all_results:
@@ -393,23 +388,25 @@ def main():
             best = ranked_suites[0]
             worst = ranked_suites[-1]
 
-            print("\n  🏆 \033[1;32mBEST BENEFITED WORKLOAD / GREATEST IMPACT:\033[0m")
-            if best[2] >= 1.0:
-                gain = (best[2] - 1.0) * 100.0
-                print(f"    • \033[1m{best[0]} ({best[1]})\033[0m: \033[1;32m+{gain:.1f}% FASTER (Speedup: {best[2]:.2f}x)\033[0m")
-                print(f"      (Baseline: {best[3]} cycles --> Active Run: {best[4]} cycles)")
-            else:
-                print(f"    • \033[1m{best[0]} ({best[1]})\033[0m: Best resilient workload under modified parameters.")
+            has_gain = best[2] > 1.0001
+            has_loss = worst[2] < 0.9999
 
-            print("\n  ⚠️  \033[1;31mMOST SENSITIVE WORKLOAD / BIGGEST BOTTLENECK REGRESSION:\033[0m")
-            if worst[2] < 1.0:
+            if has_gain:
+                gain = (best[2] - 1.0) * 100.0
+                print("  🏆 \033[1;32mGREATEST PERFORMANCE IMPROVEMENT:\033[0m")
+                print(f"    • \033[1m{best[0]}\033[0m ({best[1]}): \033[1;32m+{gain:.1f}% FASTER (Speedup: {best[2]:.2f}x)\033[0m")
+                print(f"      Baseline: {best[3]} cycles ➔ Active Run: {best[4]} cycles\n")
+
+            if has_loss:
                 loss = (1.0 - worst[2]) * 100.0
-                print(f"    • \033[1m{worst[0]} ({worst[1]})\033[0m: \033[1;31m{loss:.1f}% SLOWER (Slowdown: {(1.0/worst[2]):.2f}x)\033[0m")
-                print(f"      (Baseline: {worst[3]} cycles --> Active Run: {worst[4]} cycles)")
-            else:
-                print(f"    • \033[1m{worst[0]} ({worst[1]})\033[0m: No slowdown detected across any microbenchmark suite.")
+                print("  ⚠️  \033[1;31mGREATEST BOTTLENECK / PERFORMANCE REGRESSION:\033[0m")
+                print(f"    • \033[1m{worst[0]}\033[0m ({worst[1]}): \033[1;31m{loss:.1f}% SLOWER (Slowdown: {(1.0/worst[2]):.2f}x)\033[0m")
+                print(f"      Baseline: {worst[3]} cycles ➔ Active Run: {worst[4]} cycles\n")
+
+            if not has_gain and not has_loss:
+                print("  ℹ️  \033[1mNeutral Sensitivity\033[0m: All evaluated workloads ran within ±0.01% of baseline timing.")
     else:
-        print("  (All parameters match baseline configuration; no sensitivity delta detected)")
+        print("  (All hardware parameters match baseline default; no sensitivity delta detected)")
 
     # Save summary report file
     summary_path = os.path.join(REPORTS_DIR, f"summary_{timestamp}.txt")
@@ -419,9 +416,12 @@ def main():
         fp.write("================================================================================\n")
         fp.write(f"Generation Timestamp:  {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         fp.write(f"Applied Configuration: {active_cfg}\n")
-        fp.write("Active Modifications:\n")
-        for sec, k, v_b, v_a in changed_knobs:
-            fp.write(f"  • [{sec}] {k}: {v_b} --> {v_a}\n")
+        fp.write("Active Modifications (vs Baseline):\n")
+        if changed_knobs:
+            for sec, k, v_b, v_a in changed_knobs:
+                fp.write(f"  • [{sec}] {k}: Baseline ({v_b}) ➔ Active ({v_a})\n")
+        else:
+            fp.write("  • (No modifications; matches default baseline)\n")
         fp.write("--------------------------------------------------------------------------------\n")
         fp.write("Evaluated Suite Reports:\n")
         for rep in generated_reports:
