@@ -135,7 +135,7 @@ struct UArchStats {
     [[nodiscard]] std::string format_text() const {
         std::ostringstream oss;
         oss << "============================================================\n"
-            << "               TinyArmSim uArch Simulation Report           \n"
+            << "               TinyCpuSim uArch Simulation Report           \n"
             << "============================================================\n"
             << "Simulated Target Clock:    " << std::fixed << std::setprecision(2) << target_frequency_mhz << " MHz\n"
             << "Simulated Target Time:     " << std::scientific << std::setprecision(4) << simulated_time_seconds() << " s\n"

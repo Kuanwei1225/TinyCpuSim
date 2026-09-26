@@ -65,7 +65,7 @@ TEST(TopDownProfilerTest, MultiFormatExportGeneratesValidOutputs) {
 
     // Text format check
     std::string text = profiler.format_text();
-    EXPECT_NE(text.find("TinyArmSim Top-Down"), std::string::npos);
+    EXPECT_NE(text.find("TinyCpuSim Top-Down"), std::string::npos);
     EXPECT_NE(text.find("Retiring"), std::string::npos);
 
     // JSON format check

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(TinyArmSim
+project(TinyCpuSim
     VERSION 0.1.0
     LANGUAGES CXX C
 )
@@ -22,7 +22,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_library(tinyarmsim_core INTERFACE)
 target_include_directories(tinyarmsim_core INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Main Executable CLI
+# Main Executable CLIs
+add_executable(tinycpusim src/main.cpp)
+target_link_libraries(tinycpusim PRIVATE tinyarmsim_core)
+
 add_executable(tinyarmsim src/main.cpp)
 target_link_libraries(tinyarmsim PRIVATE tinyarmsim_core)
 

@@ -264,7 +264,7 @@ public:
     [[nodiscard]] std::string format_text() const {
         std::ostringstream oss;
         oss << "======================================================================\n"
-            << "               TinyArmSim Top-Down Microarchitecture Report           \n"
+            << "               TinyCpuSim Top-Down Microarchitecture Report           \n"
             << "======================================================================\n";
 
         for (size_t i = 0; i < core_reports_.size(); ++i) {

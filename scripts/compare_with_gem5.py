@@ -71,7 +71,7 @@ def print_table(case_name, ts, g5):
     print("=" * 70)
     print(f"     Accuracy Delta Report: [{case_name}] vs gem5 Golden")
     print("=" * 70)
-    print(f"{'Metric':<25} | {'TinyArmSim':<14} | {'gem5 Golden':<14} | {'Delta (%)':<10}")
+    print(f"{'Metric':<25} | {'TinyCpuSim':<14} | {'gem5 Golden':<14} | {'Delta (%)':<10}")
     print("-" * 70)
     
     metrics = [
@@ -95,7 +95,9 @@ def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     golden_dir = os.path.join(root_dir, "tests", "golden", "gem5")
     fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
-    sim_bin = os.path.join(root_dir, "build", "tinyarmsim")
+    sim_bin = os.path.join(root_dir, "build", "tinycpusim")
+    if not os.path.exists(sim_bin):
+        sim_bin = os.path.join(root_dir, "build", "tinyarmsim")
 
     if len(sys.argv) == 1 or sys.argv[1] in ['--all', '-a']:
         # Batch regression mode against all golden files

@@ -16,7 +16,7 @@
 namespace {
 
 void print_usage(const char* prog_name) {
-    std::cout << "TinyArmSim v" << tinyarmsim::get_version_string() << " - ARM CPU ISA & uArch Simulator\n\n"
+    std::cout << "TinyCpuSim v" << tinyarmsim::get_version_string() << " - ARM CPU ISA & Out-of-Order uArch Simulator\n\n"
               << "Usage: " << prog_name << " [options] <elf-file>\n\n"
               << "General Options:\n"
               << "  --elf <file>             Specify input ELF binary file\n"
@@ -183,7 +183,7 @@ int main(int argc, char* argv[]) {
     tinyarmsim::IsaInterpreter interpreter(state, bus);
     interpreter.set_logging(enable_log);
 
-    std::cout << "TinyArmSim v" << tinyarmsim::get_version_string() << "\n"
+    std::cout << "TinyCpuSim v" << tinyarmsim::get_version_string() << "\n"
               << "Loading ELF: " << elf_path << "...\n";
 
     if (enable_uarch) {
