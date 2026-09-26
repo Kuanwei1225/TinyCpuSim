@@ -235,6 +235,98 @@ Aggregate Throughput (IPC):0.801 inst/cycle (uOp IPC: 1.548)
 
 ---
 
+## Target Program Hardware Parameter Exploration (`experiment.py`)
+
+TinyCpuSim provides an experiment and knob-tuning utility (`scripts/experiment.py`) allowing you to inspect, modify, and compare microarchitectural parameters for **one specific program** or **a selected group of programs** with an automated side-by-side baseline delta report.
+
+---
+
+### 1. Listing All Tunable Hardware Parameters (Knobs)
+
+To display all available parameters across all pipeline and memory stages:
+```bash
+./run.sh knobs
+# Or directly:
+python3 scripts/experiment.py --list-params
+```
+
+#### Tunable Parameters Summary:
+| Section | Parameter / Knob | Aliases | Default | Description |
+|:---|:---|:---|:---:|:---|
+| `[core]` | `issue_width`, `fetch_width`, `commit_width` | `width` | 4 | Superscalar pipeline width per cycle |
+| `[core]` | `rob_size` | `rob` | 64 | Reorder Buffer (ROB) capacity entries |
+| `[core]` | `rs_size` | `iq`, `rs` | 32 | Issue Queue / Reservation Station capacity |
+| `[core]` | `num_phys_regs` | `prf` | 128 | Physical Register File (PRF) total registers |
+| `[branch_predictor]` | `type` | `bp`, `bpu` | TAGE | Direction Predictor (`IDEAL`, `BIMODAL`, `GSHARE`, `TAGE`) |
+| `[branch_predictor]` | `table_size`, `btb_size`, `ras_size` | `btb`, `ras` | 4096 / 32 | History table, BTB entries, and RAS stack depth |
+| `[lsu]` | `lq_size`, `sq_size` | `lq`, `sq` | 16 / 16 | Load Queue & Store Queue capacities |
+| `[lsu]` | `enable_store_forwarding` | `store_forward` | true | Enable 0-cycle store-to-load queue bypass |
+| `[cache_l1i]` | `size_bytes`, `associativity` | `l1i_size` | 32KB / 4-way | L1 Instruction Cache capacity & associativity |
+| `[cache_l1d]` | `size_bytes`, `associativity` | `l1d_size` | 32KB / 4-way | L1 Data Cache capacity & associativity |
+| `[cache_l2]` | `size_bytes`, `associativity` | `l2_size` | 512KB / 8-way | Shared L2 Cache capacity & associativity |
+| `[system]` | `dram_latency_cycles` | `dram_latency` | 80 | Main memory DRAM access latency in cycles |
+
+---
+
+### 2. Listing Available Workload Programs (ELFs)
+
+```bash
+./run.sh elfs
+# Or directly:
+python3 scripts/experiment.py --list-elfs
+```
+
+---
+
+### 3. Running Single-Program Parameter Experiments
+
+Evaluate the exact performance impact when modifying parameters on a target program:
+
+```bash
+# Test the impact of shrinking ROB size to 16 on Fibonacci
+python3 scripts/experiment.py --elf test_fibonacci.elf --set rob=16
+
+# Test the impact of widening issue width to 8-way with TAGE on Sorting
+python3 scripts/experiment.py --elf test_sort.elf --set width=8 --set bp=TAGE
+
+# Test disabling Store-to-Load Forwarding on Store-Forward benchmark
+python3 scripts/experiment.py --elf test_store_forward.elf --set store_forward=false
+```
+
+#### Example Comparison Report Output:
+```text
+==============================================================================
+       Experiment Comparison Report: [test_fibonacci.elf]
+==============================================================================
+  Active Hardware Parameter Modifications:
+    - [core] rob_size: default  -->  16
+------------------------------------------------------------------------------
+  Hardware Metric                | Baseline     | Experiment   | Delta (%)   
+  --------------------------------------------------------------------------
+  Simulated Total Cycles         | 2132         | 2262         | +6.10%      
+  Committed Instructions         | 1708         | 1708         | 0.0%        
+  Throughput (IPC)               | 0.801        | 0.755        | -5.74%      
+  Branch Predictor Accuracy      | 74.2%        | 73.7%        | -0.67%      
+  Store-to-Load Forwards         | 54           | 4            | -92.59%     
+  ROB Full Stalls                | 0 cycles     | 932 cycles   | ---         
+  TMAM Backend Bound             | 0.0%         | 22.02%       | ---         
+  TMAM Retiring                  | 100.0%       | 77.98%       | -22.02%     
+==============================================================================
+```
+
+---
+
+### 4. Running Multi-Program Evaluation Under Identical Hardware Changes
+
+Evaluate multiple programs simultaneously to observe workload-dependent trends:
+
+```bash
+# Evaluate Width=8-way across Fibonacci, Sort, and Stress loop
+python3 scripts/experiment.py --elf test_fibonacci,test_sort,test_stress --set width=8
+```
+
+---
+
 ## Microarchitecture Parameter Sweeps (`sweep_parameters.py`)
 
 Explore the design space by sweeping hardware parameters across target programs:
