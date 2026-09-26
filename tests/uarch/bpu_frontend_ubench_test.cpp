@@ -338,3 +338,50 @@ TEST(BpuFrontendUBenchTest, Frontend_UBench_DecoderIllegalOpcodeFault) {
     EXPECT_EQ(uops[0].type, UOpType::HALT);
     EXPECT_EQ(uops[0].pc, 0xDEAD);
 }
+
+// 7. Isolation Test: Non-conditional branches (BL calls and POP PC returns) must NOT pollute GHR
+TEST(BpuFrontendUBenchTest, BPU_UBench_CallReturnPreservesConditionalGHR) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL; // BiModeBP
+    cfg.table_size = 2048;
+    cfg.btb_size = 512;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    const uint32_t cond_pc = 0x1000;
+    const uint32_t cond_target = 0x1040;
+    const uint32_t call_pc = 0x2004; // Index 1 in 512-entry BTB (cond_pc is Index 0)
+    const uint32_t ret_pc = 0x3008;  // Index 2 in 512-entry BTB
+
+    // 1. Train conditional branch on a standard loop pattern (8 Taken, 1 Not-Taken)
+    for (int rep = 0; rep < 20; ++rep) {
+        for (int i = 0; i < 8; ++i) {
+            auto pred = bpu.predict(cond_pc, BranchType::DIRECT_COND, true);
+            bpu.update(cond_pc, true, cond_target, BranchType::DIRECT_COND, pred);
+            if (!pred.taken) {
+                bpu.squash(pred, true);
+            }
+        }
+        auto pred = bpu.predict(cond_pc, BranchType::DIRECT_COND, true);
+        bpu.update(cond_pc, false, cond_pc + 4, BranchType::DIRECT_COND, pred);
+        if (pred.taken) {
+            bpu.squash(pred, false);
+        }
+    }
+
+    // 2. Interleave 50 BL calls and 50 RET returns
+    for (int i = 0; i < 50; ++i) {
+        auto call_pred = bpu.predict(call_pc, BranchType::DIRECT_CALL, false);
+        EXPECT_TRUE(call_pred.taken);
+        bpu.update(call_pc, true, 0x2100, BranchType::DIRECT_CALL, call_pred);
+
+        auto ret_pred = bpu.predict(ret_pc, BranchType::RETURN, false);
+        bpu.update(ret_pc, true, 0x2004, BranchType::RETURN, ret_pred);
+    }
+
+    // 3. Conditional branch prediction must remain strongly TAKEN (accuracy > 99%)
+    auto post_call_pred = bpu.predict(cond_pc, BranchType::DIRECT_COND, true);
+    EXPECT_TRUE(post_call_pred.taken);
+    EXPECT_EQ(post_call_pred.target_pc, cond_target);
+}
+

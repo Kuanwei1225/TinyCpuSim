@@ -491,14 +491,14 @@ public:
           btb_(cfg.btb_size > 0 ? cfg.btb_size : 1024),
           ras_(cfg.ras_size > 0 ? cfg.ras_size : 16) {}
 
-    [[nodiscard]] BranchPrediction predict(uint32_t pc) noexcept {
+    [[nodiscard]] BranchPrediction predict(uint32_t pc, BranchType hint_type = BranchType::DIRECT_COND, bool is_conditional = true) noexcept {
         BranchPrediction pred;
         if (!config_.is_active()) {
             return pred;
         }
 
         uint32_t btb_target = 0;
-        BranchType btb_type = BranchType::DIRECT_COND;
+        BranchType btb_type = hint_type;
         bool btb_hit = btb_.lookup(pc, btb_target, btb_type);
 
         if (btb_hit) {
@@ -508,9 +508,47 @@ public:
         } else {
             stats_.btb_misses++;
             pred.is_branch = false;
+            pred.type = hint_type;
         }
 
-        // Conditional / Direction prediction is always queried to keep speculative GHR in sync
+        // Determine if branch requires direction prediction
+        bool is_cond_branch = is_conditional && (pred.type == BranchType::DIRECT_COND);
+
+        if (btb_hit) {
+            // Function Return handling via RAS
+            if (pred.type == BranchType::RETURN) {
+                uint32_t ras_target = 0;
+                if (ras_.peek(ras_target)) {
+                    stats_.ras_hits++;
+                    pred.taken = true;
+                    pred.target_pc = ras_target;
+                    return pred;
+                } else if (ras_target == 0 && btb_target != 0) {
+                    pred.taken = true;
+                    pred.target_pc = btb_target;
+                    return pred;
+                } else {
+                    stats_.ras_misses++;
+                }
+            }
+
+            // Unconditional Direct / Indirect branches & Calls are always taken
+            if (pred.type == BranchType::DIRECT_UNCOND || pred.type == BranchType::DIRECT_CALL ||
+                pred.type == BranchType::INDIRECT_CALL || pred.type == BranchType::INDIRECT_BRANCH) {
+                pred.taken = true;
+                pred.target_pc = btb_target;
+                return pred;
+            }
+        }
+
+        if (!is_cond_branch) {
+            pred.taken = (pred.type == BranchType::DIRECT_UNCOND || pred.type == BranchType::DIRECT_CALL ||
+                          pred.type == BranchType::INDIRECT_CALL || pred.type == BranchType::INDIRECT_BRANCH);
+            pred.target_pc = btb_hit ? btb_target : (pc + 2);
+            return pred;
+        }
+
+        // Conditional Branch Direction Prediction (only conditional branches advance GHR)
         bool dir_taken = false;
         switch (config_.type) {
             case PredictorType::BIMODAL:
@@ -536,26 +574,6 @@ public:
         }
 
         if (btb_hit) {
-            // Function Return handling via RAS
-            if (btb_type == BranchType::RETURN) {
-                uint32_t ras_target = 0;
-                if (ras_.peek(ras_target)) {
-                    stats_.ras_hits++;
-                    pred.taken = true;
-                    pred.target_pc = ras_target;
-                    return pred;
-                } else {
-                    stats_.ras_misses++;
-                }
-            }
-
-            // Unconditional Direct / Call branches are always taken
-            if (btb_type == BranchType::DIRECT_UNCOND || btb_type == BranchType::DIRECT_CALL) {
-                pred.taken = true;
-                pred.target_pc = btb_target;
-                return pred;
-            }
-
             pred.taken = dir_taken;
             pred.target_pc = dir_taken ? btb_target : (pc + 2);
         } else {
@@ -569,27 +587,31 @@ public:
     void update(uint32_t pc, bool taken, uint32_t actual_target, BranchType type, const BranchPrediction& pred) noexcept {
         if (!config_.is_active()) return;
 
-        // Update BTB
-        btb_.update(pc, actual_target, type);
+        // Update BTB on taken branches
+        if (taken) {
+            btb_.update(pc, actual_target, type);
+        }
 
-        // Update Direction Predictor
-        switch (config_.type) {
-            case PredictorType::BIMODAL:
-                bimode_.update(pc, taken, pred.bimode_hist);
-                break;
-            case PredictorType::GSHARE:
-                gshare_.update(pc, taken);
-                break;
-            case PredictorType::TAGE: {
-                TagePredictor::PredictionResult tage_res;
-                tage_res.taken = pred.taken;
-                tage_res.provider_table = pred.provider_table;
-                tage_.update(pc, taken, tage_res);
-                break;
+        // Update Direction Predictor (ONLY for conditional branches)
+        if (type == BranchType::DIRECT_COND) {
+            switch (config_.type) {
+                case PredictorType::BIMODAL:
+                    bimode_.update(pc, taken, pred.bimode_hist);
+                    break;
+                case PredictorType::GSHARE:
+                    gshare_.update(pc, taken);
+                    break;
+                case PredictorType::TAGE: {
+                    TagePredictor::PredictionResult tage_res;
+                    tage_res.taken = pred.taken;
+                    tage_res.provider_table = pred.provider_table;
+                    tage_.update(pc, taken, tage_res);
+                    break;
+                }
+                case PredictorType::IDEAL:
+                default:
+                    break;
             }
-            case PredictorType::IDEAL:
-            default:
-                break;
         }
 
         // RAS updates on call/return

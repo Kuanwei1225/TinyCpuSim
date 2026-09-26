@@ -100,7 +100,27 @@ public:
                     is_svc = true;
                 }
                 if (uop.is_branch) {
-                    BranchPrediction pred = branch_pred_.predict(current_inst_pc);
+                    BranchType btype = BranchType::DIRECT_COND;
+                    bool is_cond = true;
+
+                    if (uop.opcode == Opcode::BL) {
+                        btype = BranchType::DIRECT_CALL;
+                        is_cond = false;
+                    } else if (uop.opcode == Opcode::BLX) {
+                        btype = BranchType::INDIRECT_CALL;
+                        is_cond = false;
+                    } else if (uop.type == UOpType::RET || (uop.opcode == Opcode::BX && uop.arch_src1 == 14)) {
+                        btype = BranchType::RETURN;
+                        is_cond = false;
+                    } else if (uop.opcode == Opcode::BX) {
+                        btype = BranchType::INDIRECT_BRANCH;
+                        is_cond = false;
+                    } else if (uop.cond == ConditionCode::AL && uop.opcode == Opcode::B) {
+                        btype = BranchType::DIRECT_UNCOND;
+                        is_cond = false;
+                    }
+
+                    BranchPrediction pred = branch_pred_.predict(current_inst_pc, btype, is_cond);
                     uop.pred_taken = pred.taken;
                     uop.pred_target = pred.target_pc & ~1u;
                     uop.branch_pred = pred;
