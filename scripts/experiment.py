@@ -12,6 +12,7 @@ import subprocess
 import re
 import tempfile
 import glob
+import configparser
 
 # -----------------------------------------------------------------------------
 # Microarchitectural Parameters Catalog
@@ -384,6 +385,47 @@ mshr_entries = 16
     tmp.close()
     return tmp.name
 
+def parse_ini_sections(file_path):
+    config = configparser.ConfigParser(strict=False, inline_comment_prefixes=('#', ';'))
+    if not file_path or not os.path.exists(file_path):
+        return config
+    try:
+        config.read(file_path)
+    except Exception:
+        pass
+    return config
+
+def diff_configs(base_path, exp_path):
+    base_cfg = parse_ini_sections(base_path)
+    exp_cfg = parse_ini_sections(exp_path)
+    
+    diffs = []
+    all_secs = sorted(list(set(base_cfg.sections()) | set(exp_cfg.sections())))
+    for sec in all_secs:
+        if sec in ["workload", "simulation"]:
+            continue
+        base_items = dict(base_cfg.items(sec)) if base_cfg.has_section(sec) else {}
+        exp_items = dict(exp_cfg.items(sec)) if exp_cfg.has_section(sec) else {}
+        
+        all_keys = sorted(list(set(base_items.keys()) | set(exp_items.keys())))
+        for k in all_keys:
+            v_base = base_items.get(k, "<unset>")
+            v_exp = exp_items.get(k, "<unset>")
+            if v_base != v_exp:
+                diffs.append((sec, k, v_base, v_exp))
+    return diffs
+
+def get_elf_from_config(cfg_path):
+    if not cfg_path or not os.path.exists(cfg_path):
+        return None
+    config = parse_ini_sections(cfg_path)
+    for sec in ["workload", "simulation"]:
+        if config.has_section(sec) and config.has_option(sec, "elf_path"):
+            p = config.get(sec, "elf_path").strip()
+            if p:
+                return p
+    return None
+
 def format_report_header(elf_path, cfg_file, overrides_list=None):
     import datetime
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -435,9 +477,12 @@ def print_comparison_table(elf_name, changed_params, base_stats, exp_stats):
     print("=" * 84)
     
     if changed_params:
-        print("  Active Hardware Parameter Overrides:")
+        print("  Active Hardware Parameter Modifications (vs Baseline):")
         for sec, key, old_v, new_v in changed_params:
             print(f"    • [{sec}] {key}: {old_v}  -->  \033[1;32m{new_v}\033[0m")
+        print("-" * 84)
+    else:
+        print("  Active Hardware Parameters: (Matches Default Baseline Configuration)")
         print("-" * 84)
 
     # 1. Executive Summary
@@ -572,9 +617,11 @@ def main():
         description="TinyCpuSim Microarchitectural Experiment & Parameter Tuning Tool",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    parser.add_argument("target_elf", nargs="?", help="Optional target ELF binary (defaults to active config or test_fibonacci.elf)")
     parser.add_argument("--elf", "-e", help="Target ELF binary name or comma-separated list (e.g. test_fibonacci.elf or test_fibonacci,test_sort)")
-    parser.add_argument("--set", "-s", action="append", help="Override hardware parameter: --set <param>=<value>\n(e.g. --set rob=128 --set width=8 --set l1d_size=64KB --set bp=TAGE)")
+    parser.add_argument("--exp-config", "-ec", help="Experiment configuration file (defaults to active configs/current.cfg)")
     parser.add_argument("--config", "-c", help="Baseline configuration file or snapshot name in configs/save/ or configs/default/")
+    parser.add_argument("--set", "-s", action="append", help="Override hardware parameter: --set <param>=<value>\n(e.g. --set rob=128 --set width=8 --set l1d_size=64KB --set bp=TAGE)")
     parser.add_argument("--base-report", "-br", help="Optional pre-existing baseline report text file to compare against (skips baseline simulation)")
     parser.add_argument("--re-run-baseline", action="store_true", help="Force re-running baseline simulation instead of using reports/default/")
     parser.add_argument("--baseline-list", action="store_true", help="List all established default baseline reports in reports/default/")
@@ -619,8 +666,6 @@ def main():
         list_elfs()
         sys.exit(0)
 
-    # Resolve target ELFs
-    elf_targets = []
     if args.baseline_update:
         target = args.baseline_update
         if not target.endswith('.elf'): target += '.elf'
@@ -641,12 +686,33 @@ def main():
         print(f"\033[1;32m[OK]\033[0m Updated default baseline report: \033[1m{dest_report}\033[0m")
         sys.exit(0)
 
-    if not args.elf:
-        print("Error: No target ELF specified. Use --elf <name> or --list-elfs to see available workloads.")
-        print("Run 'python3 scripts/experiment.py --help' or 'python3 scripts/experiment.py --list-params' for options.")
-        sys.exit(1)
+    # 1. Resolve Target ELFs
+    raw_elf_str = args.elf or args.target_elf
+    current_cfg_path = os.path.join(configs_dir, "current.cfg")
+    if not raw_elf_str:
+        cfg_elf = get_elf_from_config(current_cfg_path)
+        if cfg_elf:
+            raw_elf_str = cfg_elf
+        else:
+            raw_elf_str = "test_fibonacci.elf"
 
-    # Smart baseline config resolution
+    elf_targets = []
+    for item in raw_elf_str.split(','):
+        item = item.strip()
+        if not item: continue
+        if not item.endswith('.elf'): item += '.elf'
+        full_path = item if os.path.isabs(item) else os.path.join(fixtures_dir, os.path.basename(item))
+        if not os.path.exists(full_path):
+            cand = os.path.join(root_dir, item)
+            if os.path.exists(cand):
+                full_path = cand
+            else:
+                print(f"Error: ELF fixture not found: {full_path}")
+                print("Run 'python3 scripts/experiment.py --list-elfs' to view available ELFs.")
+                sys.exit(1)
+        elf_targets.append(full_path)
+
+    # 2. Resolve Baseline Configuration
     base_cfg = None
     if args.config:
         cfg_cand = args.config
@@ -672,25 +738,22 @@ def main():
             default_base = os.path.join(configs_dir, "current.cfg")
         base_cfg = default_base
 
+    # 3. Resolve Experiment Configuration
+    if args.exp_config:
+        exp_source_cfg = args.exp_config
+    else:
+        exp_source_cfg = current_cfg_path if os.path.exists(current_cfg_path) else base_cfg
+
     if not os.path.exists(sim_bin):
         print(f"Simulator binary not found. Running build first...")
         subprocess.run([os.path.join(root_dir, "scripts", "01_build.sh")], check=True)
 
-    for item in args.elf.split(','):
-        item = item.strip()
-        if not item: continue
-        if not item.endswith('.elf'): item += '.elf'
-        full_path = item if os.path.isabs(item) else os.path.join(fixtures_dir, os.path.basename(item))
-        if not os.path.exists(full_path):
-            print(f"Error: ELF fixture not found: {full_path}")
-            print("Run 'python3 scripts/experiment.py --list-elfs' to view available ELFs.")
-            sys.exit(1)
-        elf_targets.append(full_path)
-
-    # Process parameter overrides
+    # 4. Process Parameter Overrides
     overrides = []
     changed_params = []
+    is_temp_cfg = False
     if args.set:
+        is_temp_cfg = True
         for item in args.set:
             if '=' not in item:
                 print(f"Warning: Invalid override format: '{item}'. Expected format is 'key=value'.")
@@ -699,37 +762,35 @@ def main():
             k = k.strip().lower()
             v = v.strip()
             
-            # Resolve alias or direct name
             sec = "core"
             actual_key = k
             if k in PARAM_ALIASES:
                 sec, actual_key = PARAM_ALIASES[k]
             else:
-                # Find section from catalog
                 for s_name, s_info in PARAM_CATALOG.items():
                     if k in s_info["params"]:
                         sec = s_name
                         actual_key = k
                         break
 
-            # Handle byte sizes (e.g. 64KB -> 65536)
             if actual_key in ["size_bytes", "l1i_size", "l1d_size", "l2_size"] and any(c.isalpha() for c in v):
                 v_num = parse_byte_size(v)
                 v = str(v_num)
 
-            # Special case for width: expand to fetch, decode, issue, commit
             if actual_key == "issue_width" and k in ["width", "issue_width"]:
                 overrides.append(("core", "fetch_width", v))
                 overrides.append(("core", "decode_width", v))
                 overrides.append(("core", "issue_width", v))
                 overrides.append(("core", "commit_width", v))
-                changed_params.append(("core", "pipeline_width (fetch/decode/issue/commit)", "4", v))
+                changed_params.append(("core", "pipeline_width (fetch/decode/issue/commit)", "default", v))
             else:
                 overrides.append((sec, actual_key, v))
                 changed_params.append((sec, actual_key, "default", v))
 
-    # Generate experiment config
-    exp_cfg = generate_config_with_overrides(base_cfg, overrides)
+        exp_cfg = generate_config_with_overrides(exp_source_cfg, overrides)
+    else:
+        exp_cfg = exp_source_cfg
+        changed_params = diff_configs(base_cfg, exp_cfg)
 
     try:
         for elf_path in elf_targets:
@@ -749,7 +810,6 @@ def main():
             else:
                 print(f"Simulating baseline run for {os.path.basename(elf_path)} on {os.path.basename(base_cfg)}...")
                 base_stats, base_log = run_sim(sim_bin, elf_path, base_cfg)
-                # Save to reports/default/ if default config was used
                 if not args.config:
                     with open(default_base_report, 'w') as f_dbr:
                         f_dbr.write(format_report_header(elf_path, base_cfg))
@@ -757,7 +817,7 @@ def main():
                 base_source_label = f"Live Baseline Simulation ({base_cfg})"
 
             # 2. Run Experiment Simulation
-            print(f"Simulating experiment run with parameter modifications...")
+            print(f"Simulating experiment run on {os.path.basename(elf_path)} using {os.path.basename(exp_cfg)}...")
             exp_stats, exp_log = run_sim(sim_bin, elf_path, exp_cfg)
 
             # 3. Print Comparison
@@ -776,8 +836,11 @@ def main():
             print(f"  Experiment performance report saved to: \033[1;36m{out_file}\033[0m")
 
     finally:
-        if os.path.exists(exp_cfg):
-            os.remove(exp_cfg)
+        if is_temp_cfg and os.path.exists(exp_cfg):
+            try:
+                os.remove(exp_cfg)
+            except OSError:
+                pass
 
 if __name__ == '__main__':
     main()

@@ -13,42 +13,7 @@ print_banner() {
 }
 
 run_interactive_exp() {
-    echo ""
-    echo "============================================================"
-    echo "           Microarchitectural Experiment Wizard             "
-    echo "============================================================"
-    echo "Select target benchmark workload ELF:"
-    echo "  [1] test_fibonacci.elf (Recursive call stack, branching, ALU)"
-    echo "  [2] test_sort.elf      (Bubble sort, conditional branches, LSU)"
-    echo "  [3] test_stress.elf    (10k loop, maximum issue saturation)"
-    echo "  [4] test_mem_stride.elf(Strided memory accesses, cache misses)"
-    echo "  [5] test_store_forward.elf (Store-to-load forwarding bypass)"
-    echo "  [6] test_raw_hazard.elf(Chained RAW data dependencies)"
-    echo "  [7] test_branch_pred.elf (Mixed/alternating branch patterns)"
-    echo "============================================================"
-    read -r -p "Enter ELF choice [1-7, default: 1]: " elf_choice
-    local target_elf="test_fibonacci.elf"
-    case "${elf_choice}" in
-        2) target_elf="test_sort.elf" ;;
-        3) target_elf="test_stress.elf" ;;
-        4) target_elf="test_mem_stride.elf" ;;
-        5) target_elf="test_store_forward.elf" ;;
-        6) target_elf="test_raw_hazard.elf" ;;
-        7) target_elf="test_branch_pred.elf" ;;
-        *) target_elf="test_fibonacci.elf" ;;
-    esac
-
-    echo ""
-    echo "Enter parameter modification (e.g. rob=128, ooo=false, width=8, bp_enabled=false, l1d_size=64KB):"
-    read -r -p "Override [default: rob=128]: " param_override
-    [ -z "${param_override}" ] && param_override="rob=128"
-
-    echo ""
-    echo "Select baseline config (e.g. default, multicore, or snapshot in configs/save/):"
-    read -r -p "Baseline [default: default]: " base_choice
-    [ -z "${base_choice}" ] && base_choice="default"
-
-    python3 "${PROJECT_ROOT}/scripts/experiment.py" --elf "${target_elf}" --config "${base_choice}" --set "${param_override}"
+    python3 "${PROJECT_ROOT}/scripts/experiment.py" "$@"
 }
 
 show_help() {
@@ -69,8 +34,9 @@ show_help() {
     echo "  ./run.sh config                     # Launch interactive configuration manager TUI"
     echo ""
     echo "Microarchitectural Experiments & Baseline Management:"
-    echo "  ./run.sh exp                        # Launch Interactive Parameter Experiment Wizard"
-    echo "  ./run.sh exp --elf <elf> --set k=v  # Run parameter experiment vs cached baseline"
+    echo "  ./run.sh exp                        # Run experiment on active config (configs/current.cfg) vs baseline"
+    echo "  ./run.sh exp [elf]                  # Run experiment on target ELF using active config"
+    echo "  ./run.sh exp --set k=v              # Run experiment with hardware overrides (e.g. ooo=false)"
     echo "  ./run.sh baseline list              # List all established baseline reports in reports/default/"
     echo "  ./run.sh baseline update <elf>      # Re-simulate & update baseline report for target ELF"
     echo "  ./run.sh baseline set <elf> <rep>   # Re-anchor baseline for target ELF to a specific report file"
@@ -93,7 +59,7 @@ show_menu() {
     echo "  [3] Step 3:   Run Component Microbenchmarks (uBench)"
     echo "  [4] Step 4:   Run CPU Simulation (reads configs/current.cfg automatically)"
     echo "  [5] Step 5:   Compare Accuracy against gem5 Golden Reference"
-    echo "  [6] Exp:      Run Parameter Experiment vs Baseline on Target ELF"
+    echo "  [6] Exp:      Run Experiment on Active Config vs Baseline"
     echo "  [7] Sweep:    Run Batch Parameter Sweep on configs/sweep/"
     echo "  [H] Help:     View Complete Command & Usage Manual"
     echo "  [0] Exit"
