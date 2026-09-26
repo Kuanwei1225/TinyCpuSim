@@ -41,6 +41,7 @@ public:
         if (stalled_ || is_halted_) return;
 
         // Fetch up to fetch_width instructions per cycle
+        bool accessed_l1i = false;
         for (uint32_t i = 0; i < fetch_width_; ++i) {
             if (uop_queue_.size() >= max_queue_size_) {
                 // Fetch queue is full, stall front-end
@@ -53,8 +54,9 @@ public:
                 break;
             }
 
-            // Access L1I cache if active
-            if (l1i_ && l1i_->get_config().is_active()) {
+            // Access L1I cache once per fetch cycle
+            if (!accessed_l1i && l1i_ && l1i_->get_config().is_active()) {
+                accessed_l1i = true;
                 uint32_t lat = 1;
                 auto cache_res = l1i_->access(pc_, false, lat);
                 if (!cache_res.hit && cache_res.latency_cycles > 1) {
@@ -140,6 +142,7 @@ public:
         stalled_ = false;
         is_halted_ = false;
         fetch_stall_cycles_ = refill_penalty;
+        last_fetched_line_ = 0xFFFFFFFF;
     }
 
     [[nodiscard]] bool has_uops() const noexcept {
@@ -200,6 +203,7 @@ private:
     size_t max_queue_size_{16};
     uint64_t seq_counter_{0};
     uint32_t fetch_stall_cycles_{0};
+    uint32_t last_fetched_line_{0xFFFFFFFF};
 
     std::deque<UOp> uop_queue_;
     bool stalled_{false};

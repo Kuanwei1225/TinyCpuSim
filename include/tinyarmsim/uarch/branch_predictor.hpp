@@ -19,6 +19,14 @@ enum class BranchType : uint8_t {
     RETURN
 };
 
+struct BiModeHistory {
+    uint64_t global_history{0};
+    bool choice_taken{false};
+    bool taken_pred{false};
+    bool not_taken_pred{false};
+    bool final_pred{false};
+};
+
 struct BranchPrediction {
     bool is_branch{false};
     bool taken{false};
@@ -29,6 +37,7 @@ struct BranchPrediction {
     uint32_t predictor_meta{0};
     int8_t provider_table{-1};
     bool alt_used{false};
+    BiModeHistory bimode_hist{};
 };
 
 // Two-bit saturating counter helper (0=Strongly Not Taken, 1=Weakly Not Taken, 2=Weakly Taken, 3=Strongly Taken)
@@ -86,6 +95,82 @@ public:
 private:
     std::vector<SaturatingCounter2Bit> table_;
     size_t mask_;
+};
+
+// -----------------------------------------------------------------------------
+// Bi-Mode Predictor (gem5 BiModeBP Accurate Model)
+// -----------------------------------------------------------------------------
+class BiModePredictor {
+public:
+    explicit BiModePredictor(size_t choice_size = 8192, size_t global_size = 8192)
+        : choice_table_(choice_size, SaturatingCounter2Bit(2)),
+          taken_table_(global_size, SaturatingCounter2Bit(2)),
+          not_taken_table_(global_size, SaturatingCounter2Bit(2)),
+          choice_mask_(choice_size - 1),
+          global_mask_(global_size - 1),
+          global_history_(0) {
+        if (choice_size == 0 || (choice_size & (choice_size - 1)) != 0) {
+            throw std::invalid_argument("BiMode choice_size must be a power of 2");
+        }
+        if (global_size == 0 || (global_size & (global_size - 1)) != 0) {
+            throw std::invalid_argument("BiMode global_size must be a power of 2");
+        }
+    }
+
+    [[nodiscard]] bool predict(uint32_t pc, BiModeHistory& out_hist) noexcept {
+        size_t choice_idx = (pc >> 2) & choice_mask_;
+        size_t global_idx = ((pc >> 2) ^ global_history_) & global_mask_;
+
+        bool choice = choice_table_[choice_idx].is_taken();
+        bool taken_dir = taken_table_[global_idx].is_taken();
+        bool not_taken_dir = not_taken_table_[global_idx].is_taken();
+        bool final_pred = choice ? taken_dir : not_taken_dir;
+
+        out_hist.global_history = global_history_;
+        out_hist.choice_taken = choice;
+        out_hist.taken_pred = taken_dir;
+        out_hist.not_taken_pred = not_taken_dir;
+        out_hist.final_pred = final_pred;
+
+        // Speculative history update at fetch time
+        global_history_ = (global_history_ << 1) | (final_pred ? 1 : 0);
+
+        return final_pred;
+    }
+
+    void update(uint32_t pc, bool actual_taken, const BiModeHistory& hist) noexcept {
+        size_t choice_idx = (pc >> 2) & choice_mask_;
+        size_t global_idx = ((pc >> 2) ^ hist.global_history) & global_mask_;
+
+        if (hist.choice_taken) {
+            taken_table_[global_idx].update(actual_taken);
+        } else {
+            not_taken_table_[global_idx].update(actual_taken);
+        }
+
+        if (hist.final_pred == actual_taken || hist.choice_taken == actual_taken) {
+            choice_table_[choice_idx].update(actual_taken);
+        }
+    }
+
+    void squash_history(uint64_t saved_history, bool actual_taken) noexcept {
+        global_history_ = (saved_history << 1) | (actual_taken ? 1 : 0);
+    }
+
+    void reset() {
+        std::fill(choice_table_.begin(), choice_table_.end(), SaturatingCounter2Bit(2));
+        std::fill(taken_table_.begin(), taken_table_.end(), SaturatingCounter2Bit(2));
+        std::fill(not_taken_table_.begin(), not_taken_table_.end(), SaturatingCounter2Bit(2));
+        global_history_ = 0;
+    }
+
+private:
+    std::vector<SaturatingCounter2Bit> choice_table_;
+    std::vector<SaturatingCounter2Bit> taken_table_;
+    std::vector<SaturatingCounter2Bit> not_taken_table_;
+    size_t choice_mask_;
+    size_t global_mask_;
+    uint64_t global_history_{0};
 };
 
 // -----------------------------------------------------------------------------
@@ -305,9 +390,9 @@ public:
     }
 
     [[nodiscard]] bool lookup(uint32_t pc, uint32_t& out_target, BranchType& out_type) const noexcept {
-        size_t idx = (pc >> 1) & mask_;
+        size_t idx = (pc >> 2) & mask_;
         const auto& entry = entries_[idx];
-        if (entry.valid && entry.tag == (pc >> 1)) {
+        if (entry.valid && entry.tag == (pc >> 2)) {
             out_target = entry.target;
             out_type = entry.type;
             return true;
@@ -316,8 +401,8 @@ public:
     }
 
     void update(uint32_t pc, uint32_t target, BranchType type) noexcept {
-        size_t idx = (pc >> 1) & mask_;
-        entries_[idx].tag = (pc >> 1);
+        size_t idx = (pc >> 2) & mask_;
+        entries_[idx].tag = (pc >> 2);
         entries_[idx].target = target;
         entries_[idx].type = type;
         entries_[idx].valid = true;
@@ -392,6 +477,7 @@ public:
     explicit CompositeBranchPredictor(const BranchPredictorConfig& cfg)
         : config_(cfg),
           bimodal_(cfg.table_size > 0 ? cfg.table_size : 2048),
+          bimode_(cfg.table_size > 0 ? cfg.table_size : 8192, cfg.table_size > 0 ? cfg.table_size : 8192),
           gshare_(cfg.table_size > 0 ? cfg.table_size : 4096, 12),
           tage_(2048, cfg.tage_tables > 0 ? cfg.tage_tables : 4, 1024),
           btb_(cfg.btb_size > 0 ? cfg.btb_size : 1024),
@@ -409,43 +495,18 @@ public:
 
         if (btb_hit) {
             stats_.btb_hits++;
+            pred.is_branch = true;
+            pred.type = btb_type;
         } else {
             stats_.btb_misses++;
-            // Not a known branch in BTB
             pred.is_branch = false;
-            pred.taken = false;
-            pred.target_pc = pc + 2;
-            return pred;
         }
 
-        pred.is_branch = true;
-        pred.type = btb_type;
-
-        // Function Return handling via RAS
-        if (btb_type == BranchType::RETURN) {
-            uint32_t ras_target = 0;
-            if (ras_.peek(ras_target)) {
-                stats_.ras_hits++;
-                pred.taken = true;
-                pred.target_pc = ras_target;
-                return pred;
-            } else {
-                stats_.ras_misses++;
-            }
-        }
-
-        // Unconditional Direct / Call branches are always taken
-        if (btb_type == BranchType::DIRECT_UNCOND || btb_type == BranchType::DIRECT_CALL) {
-            pred.taken = true;
-            pred.target_pc = btb_target;
-            return pred;
-        }
-
-        // Conditional Branch direction prediction
+        // Conditional / Direction prediction is always queried to keep speculative GHR in sync
         bool dir_taken = false;
         switch (config_.type) {
             case PredictorType::BIMODAL:
-                dir_taken = bimodal_.predict(pc);
+                dir_taken = bimode_.predict(pc, pred.bimode_hist);
                 break;
             case PredictorType::GSHARE:
                 dir_taken = gshare_.predict(pc);
@@ -466,8 +527,34 @@ public:
                 break;
         }
 
-        pred.taken = dir_taken;
-        pred.target_pc = dir_taken ? btb_target : (pc + 2);
+        if (btb_hit) {
+            // Function Return handling via RAS
+            if (btb_type == BranchType::RETURN) {
+                uint32_t ras_target = 0;
+                if (ras_.peek(ras_target)) {
+                    stats_.ras_hits++;
+                    pred.taken = true;
+                    pred.target_pc = ras_target;
+                    return pred;
+                } else {
+                    stats_.ras_misses++;
+                }
+            }
+
+            // Unconditional Direct / Call branches are always taken
+            if (btb_type == BranchType::DIRECT_UNCOND || btb_type == BranchType::DIRECT_CALL) {
+                pred.taken = true;
+                pred.target_pc = btb_target;
+                return pred;
+            }
+
+            pred.taken = dir_taken;
+            pred.target_pc = dir_taken ? btb_target : (pc + 2);
+        } else {
+            // BTB miss: Fetch falls through sequentially until Execute updates BTB
+            pred.taken = false;
+            pred.target_pc = pc + 2;
+        }
         return pred;
     }
 
@@ -480,7 +567,7 @@ public:
         // Update Direction Predictor
         switch (config_.type) {
             case PredictorType::BIMODAL:
-                bimodal_.update(pc, taken);
+                bimode_.update(pc, taken, pred.bimode_hist);
                 break;
             case PredictorType::GSHARE:
                 gshare_.update(pc, taken);
@@ -508,8 +595,16 @@ public:
         }
     }
 
+    void squash(const BranchPrediction& pred, bool actual_taken) noexcept {
+        if (!config_.is_active()) return;
+        if (config_.type == PredictorType::BIMODAL) {
+            bimode_.squash_history(pred.bimode_hist.global_history, actual_taken);
+        }
+    }
+
     void reset() {
         bimodal_.reset();
+        bimode_.reset();
         gshare_.reset();
         tage_.reset();
         btb_.reset();
@@ -524,6 +619,7 @@ public:
 private:
     BranchPredictorConfig config_;
     BimodalPredictor bimodal_;
+    BiModePredictor bimode_;
     GSharePredictor gshare_;
     TagePredictor tage_;
     BranchTargetBuffer btb_;

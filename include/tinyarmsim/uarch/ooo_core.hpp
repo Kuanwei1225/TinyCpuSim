@@ -508,6 +508,7 @@ private:
                 }
                 if (uop.arch_dest == 15 || uop.type == UOpType::RET) {
                     branch_pred_count_++;
+                    branch_returns_++;
                     uint32_t actual_target = result & ~1u;
                     bool actual_taken = true;
                     bool mispredict = (!uop.pred_taken) || ((uop.pred_target & ~1u) != actual_target);
@@ -742,6 +743,7 @@ private:
                            [&](const UOp& u) { return u.seq_num > branch_uop.seq_num; }),
             rename_queue_.end());
         rat_.restore_checkpoint(branch_uop.rat_checkpoint);
+        fetch_unit_.get_branch_predictor().squash(branch_uop.branch_pred, branch_uop.actual_taken);
         fetch_unit_.flush(redirect_target, 4);
     }
 

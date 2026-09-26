@@ -387,7 +387,7 @@ struct UArchConfig {
                 if (key == "type") {
                     if (u_val == "IDEAL" || u_val == "BYPASS") cfg.default_core.branch_predictor.type = PredictorType::IDEAL;
                     else if (u_val == "NONE" || u_val == "DISABLED") cfg.default_core.branch_predictor.type = PredictorType::NONE;
-                    else if (u_val == "BIMODAL") cfg.default_core.branch_predictor.type = PredictorType::BIMODAL;
+                    else if (u_val == "BIMODAL" || u_val == "BIMODE" || u_val == "BIMODEBP") cfg.default_core.branch_predictor.type = PredictorType::BIMODAL;
                     else if (u_val == "GSHARE") cfg.default_core.branch_predictor.type = PredictorType::GSHARE;
                     else if (u_val == "TAGE") cfg.default_core.branch_predictor.type = PredictorType::TAGE;
                 }
