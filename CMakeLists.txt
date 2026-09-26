@@ -140,6 +140,17 @@ add_executable(cache_speedup_demo_test tests/uarch/cache_speedup_demo_test.cpp)
 target_link_libraries(cache_speedup_demo_test PRIVATE tinyarmsim_core gtest_main)
 gtest_discover_tests(cache_speedup_demo_test)
 
+# uArch Branch Predictor Test (Bimodal, GShare, TAGE, BTB, RAS)
+add_executable(branch_predictor_test tests/uarch/branch_predictor_test.cpp)
+target_link_libraries(branch_predictor_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(branch_predictor_test)
 
+# uArch UOp Decoder Test (Store splitting STA/STD, LDM/STM, Branches)
+add_executable(uop_decoder_test tests/uarch/uop_decoder_test.cpp)
+target_link_libraries(uop_decoder_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(uop_decoder_test)
 
-
+# uArch Fetch Unit Test (Pre-decode, L1I integration, Queue, Redirection)
+add_executable(fetch_unit_test tests/uarch/fetch_unit_test.cpp)
+target_link_libraries(fetch_unit_test PRIVATE tinyarmsim_core gtest_main)
+gtest_discover_tests(fetch_unit_test)
