@@ -514,24 +514,27 @@ public:
         // Determine if branch requires direction prediction
         bool is_cond_branch = is_conditional && (pred.type == BranchType::DIRECT_COND);
 
-        if (btb_hit) {
-            // Function Return handling via RAS
-            if (pred.type == BranchType::RETURN) {
-                uint32_t ras_target = 0;
-                if (ras_.peek(ras_target)) {
-                    stats_.ras_hits++;
-                    pred.taken = true;
-                    pred.target_pc = ras_target;
-                    return pred;
-                } else if (ras_target == 0 && btb_target != 0) {
-                    pred.taken = true;
-                    pred.target_pc = btb_target;
-                    return pred;
-                } else {
-                    stats_.ras_misses++;
-                }
+        // Function Return handling via RAS (RAS operates independently of BTB)
+        if (pred.type == BranchType::RETURN) {
+            uint32_t ras_target = 0;
+            if (ras_.peek(ras_target)) {
+                stats_.ras_hits++;
+                pred.taken = true;
+                pred.target_pc = ras_target;
+                return pred;
+            } else if (btb_hit && btb_target != 0) {
+                pred.taken = true;
+                pred.target_pc = btb_target;
+                return pred;
+            } else {
+                stats_.ras_misses++;
+                pred.taken = false;
+                pred.target_pc = pc + 2;
+                return pred;
             }
+        }
 
+        if (btb_hit) {
             // Unconditional Direct / Indirect branches & Calls are always taken
             if (pred.type == BranchType::DIRECT_UNCOND || pred.type == BranchType::DIRECT_CALL ||
                 pred.type == BranchType::INDIRECT_CALL || pred.type == BranchType::INDIRECT_BRANCH) {

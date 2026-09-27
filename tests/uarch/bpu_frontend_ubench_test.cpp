@@ -469,6 +469,8 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_SpeculativeSquashHistoryRollback) {
     auto spec_pred1 = bpu.predict(spec_branch1_pc, BranchType::DIRECT_COND, true);
     auto spec_pred2 = bpu.predict(spec_branch2_pc, BranchType::DIRECT_COND, true);
     auto spec_pred3 = bpu.predict(spec_branch3_pc, BranchType::DIRECT_COND, true);
+    static_cast<void>(spec_pred1);
+    static_cast<void>(spec_pred2);
 
     // Verify that speculative fetching mutated GHR
     EXPECT_NE(spec_pred3.bimode_hist.global_history, chk_pred.bimode_hist.global_history);
@@ -524,6 +526,57 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_BtbMissVsDirectionMispredict) {
     bool is_dir_mispredict = (dir_pred.taken != actual_dir_taken);
     EXPECT_TRUE(is_dir_mispredict);
 }
+
+// 11. Isolation Test: Comprehensive 7-branch opcode classification and RAS call/return binding
+TEST(BpuFrontendUBenchTest, BPU_UBench_BranchTypeClassificationCompleteness) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL;
+    cfg.table_size = 2048;
+    cfg.btb_size = 512;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    // 1. BEQ (DIRECT_COND)
+    auto pred_beq = bpu.predict(0x1000, BranchType::DIRECT_COND, true);
+    EXPECT_EQ(pred_beq.type, BranchType::DIRECT_COND);
+
+    // 2. B unconditional (DIRECT_UNCOND)
+    auto pred_b = bpu.predict(0x1004, BranchType::DIRECT_UNCOND, false);
+    EXPECT_EQ(pred_b.type, BranchType::DIRECT_UNCOND);
+
+    // 3. BL direct call (DIRECT_CALL)
+    auto pred_bl = bpu.predict(0x1008, BranchType::DIRECT_CALL, false);
+    EXPECT_EQ(pred_bl.type, BranchType::DIRECT_CALL);
+    bpu.update(0x1008, true, 0x2000, BranchType::DIRECT_CALL, pred_bl);
+    EXPECT_EQ(bpu.get_stats().ras_pushes, 1);
+
+    // 4. BLX indirect call (INDIRECT_CALL)
+    auto pred_blx = bpu.predict(0x100C, BranchType::INDIRECT_CALL, false);
+    EXPECT_EQ(pred_blx.type, BranchType::INDIRECT_CALL);
+    bpu.update(0x100C, true, 0x3000, BranchType::INDIRECT_CALL, pred_blx);
+    EXPECT_EQ(bpu.get_stats().ras_pushes, 2);
+
+    // 5. BX LR return (RETURN)
+    auto pred_ret1 = bpu.predict(0x3004, BranchType::RETURN, false);
+    EXPECT_EQ(pred_ret1.type, BranchType::RETURN);
+    EXPECT_TRUE(pred_ret1.taken);
+    EXPECT_EQ(pred_ret1.target_pc, 0x100C + 4); // Matched BLX return target
+    bpu.update(0x3004, true, 0x1010, BranchType::RETURN, pred_ret1);
+    EXPECT_EQ(bpu.get_stats().ras_pops, 1);
+
+    // 6. POP {pc} return (RETURN)
+    auto pred_ret2 = bpu.predict(0x2040, BranchType::RETURN, false);
+    EXPECT_EQ(pred_ret2.type, BranchType::RETURN);
+    EXPECT_TRUE(pred_ret2.taken);
+    EXPECT_EQ(pred_ret2.target_pc, 0x1008 + 4); // Matched BL return target
+    bpu.update(0x2040, true, 0x100C, BranchType::RETURN, pred_ret2);
+    EXPECT_EQ(bpu.get_stats().ras_pops, 2);
+
+    // 7. CBZ / CBNZ (DIRECT_COND)
+    auto pred_cbz = bpu.predict(0x1020, BranchType::DIRECT_COND, true);
+    EXPECT_EQ(pred_cbz.type, BranchType::DIRECT_COND);
+}
+
 
 
 
