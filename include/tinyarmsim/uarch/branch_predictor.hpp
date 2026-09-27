@@ -113,7 +113,7 @@ public:
     explicit BiModePredictor(size_t choice_size = 8192, size_t global_size = 8192)
         : choice_table_(choice_size, SaturatingCounter2Bit(2)),
           taken_table_(global_size, SaturatingCounter2Bit(2)),
-          not_taken_table_(global_size, SaturatingCounter2Bit(2)),
+          not_taken_table_(global_size, SaturatingCounter2Bit(1)),
           choice_mask_(choice_size - 1),
           global_mask_(global_size - 1),
           global_history_(0) {
@@ -156,7 +156,7 @@ public:
             not_taken_table_[global_idx].update(actual_taken);
         }
 
-        if (hist.final_pred == actual_taken || hist.choice_taken == actual_taken) {
+        if (hist.taken_pred != hist.not_taken_pred) {
             choice_table_[choice_idx].update(actual_taken);
         }
     }
@@ -168,7 +168,7 @@ public:
     void reset() {
         std::fill(choice_table_.begin(), choice_table_.end(), SaturatingCounter2Bit(2));
         std::fill(taken_table_.begin(), taken_table_.end(), SaturatingCounter2Bit(2));
-        std::fill(not_taken_table_.begin(), not_taken_table_.end(), SaturatingCounter2Bit(2));
+        std::fill(not_taken_table_.begin(), not_taken_table_.end(), SaturatingCounter2Bit(1));
         global_history_ = 0;
     }
 
