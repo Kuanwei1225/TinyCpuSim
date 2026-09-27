@@ -439,4 +439,48 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_BiModeInterferenceFiltering) {
     EXPECT_EQ(correct_b, 50);
 }
 
+// 9. Isolation Test: Speculative GHR rollback on branch squash restores true-path history with 0 bit drift
+TEST(BpuFrontendUBenchTest, BPU_UBench_SpeculativeSquashHistoryRollback) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL;
+    cfg.table_size = 2048;
+    cfg.btb_size = 512;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    const uint32_t true_branch_pc = 0x1000;
+    const uint32_t true_target_pc = 0x1080;
+    const uint32_t spec_branch1_pc = 0x2000;
+    const uint32_t spec_branch2_pc = 0x2004;
+    const uint32_t spec_branch3_pc = 0x2008;
+
+    // 1. Train true branch to establish base history H0
+    for (int i = 0; i < 10; ++i) {
+        auto pred = bpu.predict(true_branch_pc, BranchType::DIRECT_COND, true);
+        bpu.update(true_branch_pc, true, true_target_pc, BranchType::DIRECT_COND, pred);
+        if (!pred.taken) bpu.squash(pred, true);
+    }
+
+    // Capture checkpoint prediction on true branch (mispredicted as NT, but actually T)
+    auto chk_pred = bpu.predict(true_branch_pc, BranchType::DIRECT_COND, true);
+    uint64_t expected_restored_ghr = (chk_pred.bimode_hist.global_history << 1) | 1ULL;
+
+    // 2. Fetch stage speculatively fetches along wrong path (3 speculative conditional branches)
+    auto spec_pred1 = bpu.predict(spec_branch1_pc, BranchType::DIRECT_COND, true);
+    auto spec_pred2 = bpu.predict(spec_branch2_pc, BranchType::DIRECT_COND, true);
+    auto spec_pred3 = bpu.predict(spec_branch3_pc, BranchType::DIRECT_COND, true);
+
+    // Verify that speculative fetching mutated GHR
+    EXPECT_NE(spec_pred3.bimode_hist.global_history, chk_pred.bimode_hist.global_history);
+
+    // 3. Execute stage resolves true_branch as misprediction and squashes
+    bpu.squash(chk_pred, true);
+    bpu.update(true_branch_pc, true, true_target_pc, BranchType::DIRECT_COND, chk_pred);
+
+    // 4. Next fetch on true path must observe the EXACT restored GHR (0 bit drift)
+    auto post_squash_pred = bpu.predict(true_branch_pc, BranchType::DIRECT_COND, true);
+    EXPECT_EQ(post_squash_pred.bimode_hist.global_history, expected_restored_ghr);
+}
+
+
 
