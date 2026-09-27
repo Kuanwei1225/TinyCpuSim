@@ -625,6 +625,39 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_ThumbHalfwordAlignedBTBAliasing) {
     EXPECT_DOUBLE_EQ(bpu.get_stats().btb_hit_rate(), 1998.0 / 2000.0);
 }
 
+// 13. Isolation Test: Speculative branch squash accounting across Front-End queue on pipeline flush
+TEST(BpuFrontendUBenchTest, BPU_UBench_SpeculativeSquashBranchAccounting) {
+    MemoryBus bus(4096);
+    // Write 4 consecutive BEQ instructions (0xD000: BEQ .+2)
+    bus.write16(0x100, 0xd000); // BEQ
+    bus.write16(0x102, 0xd000); // BEQ
+    bus.write16(0x104, 0xd000); // BEQ
+    bus.write16(0x106, 0xd000); // BEQ
+
+    CoreConfig core_cfg;
+    core_cfg.fetch_width = 4;
+    BranchPredictorConfig bp_cfg;
+    bp_cfg.type = PredictorType::BIMODAL;
+    bp_cfg.table_size = 512;
+    bp_cfg.btb_size = 256;
+
+    FetchUnit fetch_unit(0x100, bus, nullptr, core_cfg, bp_cfg);
+
+    // Fetch 1 cycle: populates 4 branch uops in uop_queue_
+    fetch_unit.tick();
+    EXPECT_EQ(fetch_unit.queue_size(), 4);
+
+    // Initial squashed branches count is 0
+    EXPECT_EQ(fetch_unit.get_branch_predictor().get_stats().squashed_branches, 0);
+
+    // Flush front-end on misprediction redirection
+    fetch_unit.flush(0x2000, 4);
+
+    // Exactly 4 speculative branches in front-end queue must be accounted as squashed
+    EXPECT_EQ(fetch_unit.get_branch_predictor().get_stats().squashed_branches, 4);
+    EXPECT_EQ(fetch_unit.queue_size(), 0);
+}
+
 
 
 

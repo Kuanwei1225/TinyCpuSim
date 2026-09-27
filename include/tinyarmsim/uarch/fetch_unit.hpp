@@ -166,6 +166,11 @@ public:
 
     // Flush front-end on branch misprediction or exception recovery
     void flush(uint32_t target_pc, uint32_t refill_penalty = 0) noexcept {
+        for (const auto& u : uop_queue_) {
+            if (u.is_branch) {
+                record_squashed_branch();
+            }
+        }
         uop_queue_.clear();
         pc_ = target_pc & ~1u;
         stalled_ = false;
