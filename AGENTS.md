@@ -16,6 +16,6 @@ Single-context repo layout (`CONTEXT.md` + `docs/adr/`). See `docs/agents/domain
 
 ### Engineering Skills
 
-Engineering skills and practices live in `.agents/skills/skills/engineering/` (including `tdd`, `implement`, `codebase-design`, `code-review`, `wayfinder`, `domain-modeling`).
+Engineering skills and practices live in `.agents/skills/skills/engineering/` (including `tdd`, `implement`, `codebase-design`, `code-review`, `wayfinder`, `domain-modeling`, `uarch-perf-correlation`).
 Always follow TDD vertical slicing, deep module design, and agreed seams when implementing features.
 
