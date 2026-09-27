@@ -396,7 +396,7 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_BiModeInterferenceFiltering) {
 
     const uint32_t pc_taken_bias = 0x1004;
     const uint32_t target_taken = 0x1040;
-    const uint32_t pc_not_taken_bias = 0x2004;
+    const uint32_t pc_not_taken_bias = 0x2008;
 
     // Warm-up: Train pc_taken_bias as 100% Taken, and pc_not_taken_bias as 100% Not-Taken
     for (int i = 0; i < 30; ++i) {
@@ -576,6 +576,54 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_BranchTypeClassificationCompleteness) {
     auto pred_cbz = bpu.predict(0x1020, BranchType::DIRECT_COND, true);
     EXPECT_EQ(pred_cbz.type, BranchType::DIRECT_COND);
 }
+
+// 12. Isolation Test: 16-bit halfword adjacent branch BTB indexing isolation (Thumb-2 pc >> 1)
+TEST(BpuFrontendUBenchTest, BPU_UBench_ThumbHalfwordAlignedBTBAliasing) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL;
+    cfg.table_size = 2048;
+    cfg.btb_size = 512;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    const uint32_t pc_a = 0x1000;
+    const uint32_t target_a = 0x2000;
+    const uint32_t pc_b = 0x1002; // Adjacent 16-bit Thumb instruction
+    const uint32_t target_b = 0x3000;
+
+    // Warm-up: 1st lookup on both branches will be cold BTB misses
+    auto pred_a0 = bpu.predict(pc_a, BranchType::DIRECT_COND, true);
+    EXPECT_FALSE(pred_a0.is_branch);
+    bpu.update(pc_a, true, target_a, BranchType::DIRECT_COND, pred_a0);
+
+    auto pred_b0 = bpu.predict(pc_b, BranchType::DIRECT_COND, true);
+    EXPECT_FALSE(pred_b0.is_branch);
+    bpu.update(pc_b, true, target_b, BranchType::DIRECT_COND, pred_b0);
+
+    EXPECT_EQ(bpu.get_stats().btb_misses, 2);
+    EXPECT_EQ(bpu.get_stats().btb_hits, 0);
+
+    // Steady state: 99 interleaved iterations (198 lookups)
+    for (int i = 0; i < 99; ++i) {
+        // Query A
+        auto pred_a = bpu.predict(pc_a, BranchType::DIRECT_COND, true);
+        EXPECT_TRUE(pred_a.is_branch);
+        EXPECT_EQ(pred_a.target_pc, target_a);
+        bpu.update(pc_a, true, target_a, BranchType::DIRECT_COND, pred_a);
+
+        // Query B
+        auto pred_b = bpu.predict(pc_b, BranchType::DIRECT_COND, true);
+        EXPECT_TRUE(pred_b.is_branch);
+        EXPECT_EQ(pred_b.target_pc, target_b);
+        bpu.update(pc_b, true, target_b, BranchType::DIRECT_COND, pred_b);
+    }
+
+    // Exact Invariants (<1% error / 0.00% drift)
+    EXPECT_EQ(bpu.get_stats().btb_hits, 198);
+    EXPECT_EQ(bpu.get_stats().btb_misses, 2);
+    EXPECT_DOUBLE_EQ(bpu.get_stats().btb_hit_rate(), 198.0 / 200.0);
+}
+
 
 
 

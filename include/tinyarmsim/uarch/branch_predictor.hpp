@@ -125,8 +125,8 @@ public:
     }
 
     [[nodiscard]] bool predict(uint32_t pc, BiModeHistory& out_hist) noexcept {
-        size_t choice_idx = (pc >> 2) & choice_mask_;
-        size_t global_idx = ((pc >> 2) ^ global_history_) & global_mask_;
+        size_t choice_idx = (pc >> 1) & choice_mask_;
+        size_t global_idx = ((pc >> 1) ^ global_history_) & global_mask_;
 
         bool choice = choice_table_[choice_idx].is_taken();
         bool taken_dir = taken_table_[global_idx].is_taken();
@@ -146,8 +146,8 @@ public:
     }
 
     void update(uint32_t pc, bool actual_taken, const BiModeHistory& hist) noexcept {
-        size_t choice_idx = (pc >> 2) & choice_mask_;
-        size_t global_idx = ((pc >> 2) ^ hist.global_history) & global_mask_;
+        size_t choice_idx = (pc >> 1) & choice_mask_;
+        size_t global_idx = ((pc >> 1) ^ hist.global_history) & global_mask_;
 
         if (hist.choice_taken) {
             taken_table_[global_idx].update(actual_taken);
@@ -405,9 +405,9 @@ public:
     }
 
     [[nodiscard]] bool lookup(uint32_t pc, uint32_t& out_target, BranchType& out_type) const noexcept {
-        size_t idx = (pc >> 2) & mask_;
+        size_t idx = (pc >> 1) & mask_;
         const auto& entry = entries_[idx];
-        if (entry.valid && entry.tag == (pc >> 2)) {
+        if (entry.valid && entry.tag == (pc >> 1)) {
             out_target = entry.target;
             out_type = entry.type;
             return true;
@@ -416,8 +416,8 @@ public:
     }
 
     void update(uint32_t pc, uint32_t target, BranchType type) noexcept {
-        size_t idx = (pc >> 2) & mask_;
-        entries_[idx].tag = (pc >> 2);
+        size_t idx = (pc >> 1) & mask_;
+        entries_[idx].tag = (pc >> 1);
         entries_[idx].target = target;
         entries_[idx].type = type;
         entries_[idx].valid = true;
