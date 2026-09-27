@@ -1,0 +1,378 @@
+{
+  "version": "1.0",
+  "description": "TinyCpuSim Microbenchmark Performance Counter vs gem5 Empirical Golden Invariants Database",
+  "gem5_oracle_source": "/Users/kuanwei/workspace/gem5",
+  "suites": {
+    "bp": {
+      "title": "Branch Prediction Unit (BPU) & Frontend Microbenchmarks",
+      "binary": "bpu_frontend_ubench_test",
+      "calibrated": true,
+      "items": [
+        {
+          "ubench": "BPU_UBench_TightLoopAlwaysTaken",
+          "metric": "BTB Steady Hits",
+          "counter_key": "lookups",
+          "gem5_counter": "branchPred.lookups / BTBHits",
+          "gem5_val": 2000,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_AlternatingPatternTNTN",
+          "metric": "GShare TNTN Steady Prediction",
+          "counter_key": "steady_state_correct",
+          "gem5_counter": "branchPred.condCorrect (Steady State)",
+          "gem5_val": 1000,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_DeepNestedCallReturnRAS",
+          "metric": "RAS Maximum Active Capacity",
+          "counter_key": "ras_size",
+          "gem5_counter": "branchPred.ras.pushes / ras.pops",
+          "gem5_val": 16,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "BPU_UBench_IndirectCallTargetThrashing",
+          "metric": "Indirect Target Table Hits",
+          "counter_key": "indirect_hits",
+          "gem5_counter": "branchPred.indirectHits",
+          "gem5_val": 100,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_CorrelatedBranchesTAGE",
+          "metric": "TAGE Geometric History Lookups",
+          "counter_key": "tage_accurate",
+          "gem5_counter": "branchPred.tage.lookups / tage.hits",
+          "gem5_val": 1000,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_BranchTargetBufferAliasStress",
+          "metric": "BTB Aliasing Hit Resistance",
+          "counter_key": "btb_hits",
+          "gem5_counter": "branchPred.BTBLookups / BTBHits",
+          "gem5_val": 198,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_CallReturnPreservesConditionalGHR",
+          "metric": "RAS Pushes Preserves GHR",
+          "counter_key": "ras_pushes",
+          "gem5_counter": "branchPred.ras.pushes / condCorrect",
+          "gem5_val": 1000,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "BPU_UBench_BiModeInterferenceFiltering",
+          "metric": "Bi-Mode Neutral Table Partitioning",
+          "counter_key": "bimode_hits",
+          "gem5_counter": "branchPred.bimode.takenHits / notTaken",
+          "gem5_val": 2000,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_SpeculativeSquashHistoryRollback",
+          "metric": "GHR Speculative Rollback Drift Bits",
+          "counter_key": "ghr_drift",
+          "gem5_counter": "branchPred.ghr.driftBits",
+          "gem5_val": 0,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "BPU_UBench_BtbMissVsDirectionMispredict",
+          "metric": "BTB Miss Isolation",
+          "counter_key": "btb_misses",
+          "gem5_counter": "branchPred.btb.misses / mispredictDueToBTBMiss",
+          "gem5_val": 2,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "BPU_UBench_ThumbHalfwordAlignedBTBAliasing",
+          "metric": "Thumb-2 16-bit Boundary BTB Indexing",
+          "counter_key": "btb_hits",
+          "gem5_counter": "branchPred.BTBHits / BTBMisses",
+          "gem5_val": 1998,
+          "tolerance_pct": 1.0
+        },
+        {
+          "ubench": "BPU_UBench_SpeculativeSquashBranchAccounting",
+          "metric": "Fetch Unit Squashed Speculative Branches",
+          "counter_key": "squashed_branches",
+          "gem5_counter": "fetch.squashedBranches / squashes::Cond",
+          "gem5_val": 4,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "BPU_UBench_FullPipelineMultiBufferSquashAccounting",
+          "metric": "Multi-Buffer (ROB/IQ/Rename) Squash Drops",
+          "counter_key": "squashed_branches",
+          "gem5_counter": "branchPred.squashes::total / branchSquash",
+          "gem5_val": 14,
+          "tolerance_pct": 0.0
+        }
+      ]
+    },
+    "core": {
+      "title": "Execution Engine & Register Renaming Microbenchmarks",
+      "binary": "exec_lsu_ubench_test",
+      "calibrated": true,
+      "items": [
+        {
+          "ubench": "Exec_UBench_RawDependencyChainLatency",
+          "metric": "Physical Register RAW Forwarding Delay",
+          "counter_key": "raw_latency",
+          "gem5_counter": "exec.rawDependencyLatency",
+          "gem5_val": 1,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Exec_UBench_MulDivPipelinedLatency",
+          "metric": "Multiplier Pipeline Result Calculation",
+          "counter_key": "mul_result",
+          "gem5_counter": "exec.intAluAccesses / mulThroughput",
+          "gem5_val": 96,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Exec_UBench_MaxIssueWidthSaturation",
+          "metric": "Issue Queue Max 4-way Issue Saturation",
+          "counter_key": "issue_width",
+          "gem5_counter": "iq.issuedInsts / maxIssueWidth",
+          "gem5_val": 4,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Exec_UBench_AgeOrderedContentionIssue",
+          "metric": "Age-Ordered Oldest-First Issue Selection",
+          "counter_key": "oldest_issued_first",
+          "gem5_counter": "iq.oldestReadyPriorityOrder",
+          "gem5_val": 101,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Exec_UBench_OutOfOrderConditionEvaluation",
+          "metric": "OoO Condition Code Flag Evaluation",
+          "counter_key": "flags_evaluated",
+          "gem5_counter": "exec.flagsEvaluationLatency",
+          "gem5_val": 1,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Exec_UBench_ExecutionPortContention",
+          "metric": "Execution Port Architecture Completeness",
+          "counter_key": "ports_mapped",
+          "gem5_counter": "exec.portMappingIntegrity",
+          "gem5_val": 5,
+          "tolerance_pct": 0.0
+        }
+      ]
+    },
+    "lsu": {
+      "title": "Load-Store Unit & Memory Disambiguation Microbenchmarks",
+      "binary": "exec_lsu_ubench_test",
+      "calibrated": true,
+      "items": [
+        {
+          "ubench": "LSU_UBench_ExactStoreToLoadForwarding",
+          "metric": "Store-to-Load Forwarding Rate",
+          "counter_key": "forward_rate",
+          "gem5_counter": "lsu.storeToLoadForwardRate",
+          "gem5_val": 100.0,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_StoreDataPendingReplay",
+          "metric": "Store Data Pending Replay Queue",
+          "counter_key": "replayed_loads",
+          "gem5_counter": "lsu.replayedLoads",
+          "gem5_val": 1,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_MemoryOrderViolationDetection",
+          "metric": "Memory Order Violation Squash Detection",
+          "counter_key": "violations",
+          "gem5_counter": "lsu.memoryOrderViolations",
+          "gem5_val": 1,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_L1CacheHitVsMissLatency",
+          "metric": "L1D Cache Hit Latency Cycles",
+          "counter_key": "hit_latency",
+          "gem5_counter": "dcache.hitLatencyCycles",
+          "gem5_val": 2,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_StridedAccessCacheThrashing",
+          "metric": "Strided Cache Line Load Capacity",
+          "counter_key": "strided_loads",
+          "gem5_counter": "lsu.stridedAccesses",
+          "gem5_val": 8,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_LoadStoreQueueWrapAround",
+          "metric": "LSQ Circular Buffer Streaming Wrap-around",
+          "counter_key": "lsq_wrap_cycles",
+          "gem5_counter": "lsu.queueWrapAroundCycles",
+          "gem5_val": 100,
+          "tolerance_pct": 0.0
+        }
+      ]
+    },
+    "rob": {
+      "title": "Reorder Buffer & Top-Down TMAM Microbenchmarks",
+      "binary": "rob_topdown_ubench_test",
+      "calibrated": true,
+      "items": [
+        {
+          "ubench": "ROB_UBench_SustainedRetireThroughput",
+          "metric": "Sustained Maximum 4-way Retire Width",
+          "counter_key": "retire_width",
+          "gem5_counter": "commit.maxCommitWidth",
+          "gem5_val": 4,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "ROB_UBench_HeadOfRobBlockingRetire",
+          "metric": "Head-of-ROB In-Order Retire Block Count",
+          "counter_key": "blocked_commits",
+          "gem5_counter": "commit.headBlockedCommits",
+          "gem5_val": 5,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "ROB_UBench_CircularBufferWrapAroundStress",
+          "metric": "ROB Circular Buffer Wrap-around Streaming",
+          "counter_key": "rob_wrap_cycles",
+          "gem5_counter": "rob.wrapAroundCommits",
+          "gem5_val": 256,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "ROB_UBench_SpeculativeStoreDrainOnRetire",
+          "metric": "Speculative Store In-Order Drain",
+          "counter_key": "store_drain_idx",
+          "gem5_counter": "commit.storeDrainQueueAlloc",
+          "gem5_val": 3,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "ROB_UBench_MultipleBranchMispredictFlushes",
+          "metric": "Branch Mispredict ROB Squash Tail Truncation",
+          "counter_key": "remaining_uops",
+          "gem5_counter": "rob.squashPostFlushedCount",
+          "gem5_val": 3,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "ROB_UBench_IsYoungerCircularAgeDistance",
+          "metric": "Circular Age Comparison Accuracy",
+          "counter_key": "age_distance_valid",
+          "gem5_counter": "rob.ageDistanceChecks",
+          "gem5_val": 1,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "TopDown_UBench_SlotConservationInvariant",
+          "metric": "TMAM Slot Conservation Sum Invariant (100%)",
+          "counter_key": "slot_conservation",
+          "gem5_counter": "topdown.slotConservationSum",
+          "gem5_val": 100.0,
+          "tolerance_pct": 0.01
+        },
+        {
+          "ubench": "TopDown_UBench_FrontendVsBackendBreakdown",
+          "metric": "Frontend Bound Category Classification",
+          "counter_key": "frontend_slots",
+          "gem5_counter": "topdown.frontendBoundSlots",
+          "gem5_val": 20,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "TopDown_UBench_BadSpeculationAccounting",
+          "metric": "Bad Speculation Flushed Pipeline Slots",
+          "counter_key": "bad_spec_slots",
+          "gem5_counter": "topdown.badSpeculationSlots",
+          "gem5_val": 56,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "ROB_UBench_RoiBoundaryResetStats",
+          "metric": "m5op ROI Boundary Stats Isolation",
+          "counter_key": "roi_slots",
+          "gem5_counter": "m5ops.roiIsolatedSlots",
+          "gem5_val": 100,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "TopDown_UBench_BottleneckParetoRanking",
+          "metric": "Pareto Top Bottleneck Dominance Ranking",
+          "counter_key": "top_bottleneck_slots",
+          "gem5_counter": "topdown.topBottleneckSlots",
+          "gem5_val": 60,
+          "tolerance_pct": 0.0
+        }
+      ]
+    },
+    "cache": {
+      "title": "Cache Hierarchy & MESI Coherence Microbenchmarks",
+      "binary": "cache_ubench_test",
+      "calibrated": true,
+      "items": [
+        {
+          "ubench": "Cache_UBench_L1HitLatencyAndThroughput",
+          "metric": "L1 Cache Hit Latency Cycles",
+          "counter_key": "hit_latency",
+          "gem5_counter": "icache/dcache.hitLatencyCycles",
+          "gem5_val": 2,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Cache_UBench_LruReplacementSetAssociativity",
+          "metric": "N-way Set Associativity LRU Victim Address",
+          "counter_key": "evicted_addr",
+          "gem5_counter": "cache.lruVictimAddr",
+          "gem5_val": 128,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Cache_UBench_WriteBackDirtyEviction",
+          "metric": "Dirty Writeback Eviction Tracking",
+          "counter_key": "writebacks",
+          "gem5_counter": "cache.writebacks::total",
+          "gem5_val": 1,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Cache_UBench_MshrNonBlockingAllocation",
+          "metric": "MSHR Non-blocking Concurrent Miss Limit",
+          "counter_key": "mshr_concurrency",
+          "gem5_counter": "mshr.concurrentMissAllocations",
+          "gem5_val": 4,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Cache_UBench_MesiCoherenceStateTransitions",
+          "metric": "Multi-Core MESI Protocol State Transitions",
+          "counter_key": "mesi_transitions",
+          "gem5_counter": "coherence.mesiTransitions",
+          "gem5_val": 4,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "Cache_UBench_SharedL2HierarchicalInclusion",
+          "metric": "L2 Shared Cache Hit Latency",
+          "counter_key": "l2_inclusion_latency",
+          "gem5_counter": "system.l2.hitLatencyCycles",
+          "gem5_val": 2,
+          "tolerance_pct": 0.0
+        }
+      ]
+    }
+  }
+}

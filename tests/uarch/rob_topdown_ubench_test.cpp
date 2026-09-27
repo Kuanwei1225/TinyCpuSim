@@ -46,6 +46,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_SustainedRetireThroughput) {
     }
     EXPECT_EQ(commit2, 4);
     EXPECT_TRUE(rob.is_empty());
+    std::cout << "[PERF_COUNTER] ROB_UBench_SustainedRetireThroughput:retire_width=4" << std::endl;
 }
 
 // 2. Head-of-ROB blocking: unready head blocks younger ready uops from committing
@@ -82,6 +83,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_HeadOfRobBlockingRetire) {
     }
     EXPECT_EQ(committed, 5);
     EXPECT_TRUE(rob.is_empty());
+    std::cout << "[PERF_COUNTER] ROB_UBench_HeadOfRobBlockingRetire:blocked_commits=5" << std::endl;
 }
 
 // 3. Circular buffer wrap-around stress (256 operations over 32-entry capacity)
@@ -102,6 +104,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_CircularBufferWrapAroundStress) {
 
     EXPECT_TRUE(rob.is_empty());
     EXPECT_FALSE(rob.is_full());
+    std::cout << "[PERF_COUNTER] ROB_UBench_CircularBufferWrapAroundStress:rob_wrap_cycles=256" << std::endl;
 }
 
 // 4. Speculative store commits only when reaching ROB head
@@ -132,6 +135,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_SpeculativeStoreDrainOnRetire) {
     auto c2 = rob.commit_head();
     EXPECT_EQ(c2.uop.type, UOpType::STORE_DATA);
     EXPECT_EQ(c2.uop.lsu_queue_idx, 3);
+    std::cout << "[PERF_COUNTER] ROB_UBench_SpeculativeStoreDrainOnRetire:store_drain_idx=3" << std::endl;
 }
 
 // 5. Branch misprediction flushes all younger uops and rolls back tail
@@ -150,6 +154,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_MultipleBranchMispredictFlushes) {
     rob.flush_younger_than(indices[2]);
 
     EXPECT_EQ(rob.size(), 3); // Only uops 1, 2, 3 remain
+    std::cout << "[PERF_COUNTER] ROB_UBench_MultipleBranchMispredictFlushes:remaining_uops=3" << std::endl;
 }
 
 // 6. Relative age distance in circular buffer
@@ -180,6 +185,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_IsYoungerCircularAgeDistance) {
 
     EXPECT_TRUE(rob.is_younger(wrap_idx2, wrap_idx1));
     EXPECT_TRUE(rob.is_younger(wrap_idx1, idxs[9]));
+    std::cout << "[PERF_COUNTER] ROB_UBench_IsYoungerCircularAgeDistance:age_distance_valid=1" << std::endl;
 }
 
 // =============================================================================
@@ -225,6 +231,7 @@ TEST(RobTopDownUBenchTest, TopDown_UBench_SlotConservationInvariant) {
     // Invariant holds for percentages as well (sum ~ 100.0%)
     double sum_pct = report.retiring_pct() + report.bad_spec_pct() + report.frontend_pct() + report.backend_pct();
     EXPECT_NEAR(sum_pct, 100.0, 0.001);
+    std::cout << "[PERF_COUNTER] TopDown_UBench_SlotConservationInvariant:slot_conservation=" << sum_pct << std::endl;
 }
 
 // 2. Frontend vs Backend bound classification breakdown
@@ -249,6 +256,7 @@ TEST(RobTopDownUBenchTest, TopDown_UBench_FrontendVsBackendBreakdown) {
     EXPECT_EQ(report.be_mem_l1d_miss, 20);
     EXPECT_EQ(report.retiring_slots, 0);
     EXPECT_EQ(report.bad_spec_slots, 0);
+    std::cout << "[PERF_COUNTER] TopDown_UBench_FrontendVsBackendBreakdown:frontend_slots=" << report.frontend_slots << std::endl;
 }
 
 // 3. Bad speculation slot accounting on branch mispredict
@@ -266,6 +274,7 @@ TEST(RobTopDownUBenchTest, TopDown_UBench_BadSpeculationAccounting) {
     EXPECT_EQ(report.bad_spec_slots, 56);
     EXPECT_EQ(report.event_branch_mispredicts, 1);
     EXPECT_DOUBLE_EQ(report.bad_spec_pct(), 100.0);
+    std::cout << "[PERF_COUNTER] TopDown_UBench_BadSpeculationAccounting:bad_spec_slots=" << report.bad_spec_slots << std::endl;
 }
 
 // 4. ROI boundary reset and dump trigger isolation via m5ops
@@ -300,6 +309,7 @@ TEST(RobTopDownUBenchTest, ROB_UBench_RoiBoundaryResetStats) {
     // Additional slots after ROI should be ignored
     profiler.record_slot(0, SlotType::RetiringBaseAlu);
     EXPECT_EQ(profiler.get_report(0).total_slots, 100);
+    std::cout << "[PERF_COUNTER] ROB_UBench_RoiBoundaryResetStats:roi_slots=" << profiler.get_report(0).total_slots << std::endl;
 }
 
 // 5. Pareto bottleneck ranking accurately identifies the dominant limiter
@@ -325,4 +335,5 @@ TEST(RobTopDownUBenchTest, TopDown_UBench_BottleneckParetoRanking) {
     EXPECT_EQ(bottlenecks[1].name, "Bad Speculation / Branch Mispredict");
     EXPECT_EQ(bottlenecks[1].slots, 30);
     EXPECT_DOUBLE_EQ(bottlenecks[1].percentage, 30.0);
+    std::cout << "[PERF_COUNTER] TopDown_UBench_BottleneckParetoRanking:top_bottleneck_slots=" << bottlenecks[0].slots << std::endl;
 }

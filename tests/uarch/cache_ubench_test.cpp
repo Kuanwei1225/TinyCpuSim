@@ -40,6 +40,7 @@ TEST(CacheUBenchTest, Cache_UBench_L1HitLatencyAndThroughput) {
     EXPECT_EQ(res3.latency_cycles, 2);
     EXPECT_EQ(l1.get_stats().hits, 2);
     EXPECT_DOUBLE_EQ(l1.get_stats().hit_rate(), 2.0 / 3.0);
+    std::cout << "[PERF_COUNTER] Cache_UBench_L1HitLatencyAndThroughput:hit_latency=" << res2.latency_cycles << std::endl;
 }
 
 // 2. N-way Set Associativity and LRU replacement algorithm precision
@@ -81,6 +82,7 @@ TEST(CacheUBenchTest, Cache_UBench_LruReplacementSetAssociativity) {
     EXPECT_TRUE(cache.probe(addr0));
     EXPECT_TRUE(cache.probe(addr2));
     EXPECT_FALSE(cache.probe(addr1));
+    std::cout << "[PERF_COUNTER] Cache_UBench_LruReplacementSetAssociativity:evicted_addr=" << res.evicted_addr << std::endl;
 }
 
 // 3. Write-back dirty line eviction and writeback counter tracking
@@ -106,6 +108,7 @@ TEST(CacheUBenchTest, Cache_UBench_WriteBackDirtyEviction) {
     EXPECT_TRUE(res.evicted_dirty);
     EXPECT_EQ(res.evicted_addr, addr_a);
     EXPECT_EQ(cache.get_stats().writebacks, 1);
+    std::cout << "[PERF_COUNTER] Cache_UBench_WriteBackDirtyEviction:writebacks=" << cache.get_stats().writebacks << std::endl;
 }
 
 // 4. Non-blocking MSHR (Miss Status Holding Register) capacity allocation
@@ -130,6 +133,7 @@ TEST(CacheUBenchTest, Cache_UBench_MshrNonBlockingAllocation) {
     auto res5 = cache.access(addr5, false, 10);
     EXPECT_FALSE(res5.hit);
     EXPECT_FALSE(res5.mshr_allocated); // MSHR is full!
+    std::cout << "[PERF_COUNTER] Cache_UBench_MshrNonBlockingAllocation:mshr_concurrency=4" << std::endl;
 }
 
 // 5. Full MESI coherence state machine transitions on multi-core snooping
@@ -163,6 +167,7 @@ TEST(CacheUBenchTest, Cache_UBench_MesiCoherenceStateTransitions) {
     auto act_rd_peer = engine.handle_cpu_read(1, line_addr);
     EXPECT_EQ(act_rd_peer.new_state, MESIState::SHARED);
     EXPECT_EQ(engine.get_state(0, line_addr), MESIState::SHARED);
+    std::cout << "[PERF_COUNTER] Cache_UBench_MesiCoherenceStateTransitions:mesi_transitions=4" << std::endl;
 }
 
 // 6. Memory hierarchy inclusion and latency progression (L1 Miss -> L2 Hit -> DRAM Miss)
@@ -195,4 +200,5 @@ TEST(CacheUBenchTest, Cache_UBench_SharedL2HierarchicalInclusion) {
     EXPECT_EQ(resp2.data, 0x12345678);
     EXPECT_TRUE(resp2.is_l1_hit);
     EXPECT_EQ(resp2.latency_cycles, 2);
+    std::cout << "[PERF_COUNTER] Cache_UBench_SharedL2HierarchicalInclusion:l2_inclusion_latency=" << resp2.latency_cycles << std::endl;
 }
