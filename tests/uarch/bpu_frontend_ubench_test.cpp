@@ -482,5 +482,49 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_SpeculativeSquashHistoryRollback) {
     EXPECT_EQ(post_squash_pred.bimode_hist.global_history, expected_restored_ghr);
 }
 
+// 10. Isolation Test: Fine-grained classification between BTB cold miss and Direction mispredict
+TEST(BpuFrontendUBenchTest, BPU_UBench_BtbMissVsDirectionMispredict) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL;
+    cfg.table_size = 2048;
+    cfg.btb_size = 512;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    const uint32_t pc_cold = 0x3004;
+    const uint32_t target_cold = 0x3040;
+    const uint32_t pc_dir = 0x4004;
+    const uint32_t target_dir = 0x4080;
+
+    // Case 1: Cold branch lookup causes BTB miss at fetch
+    auto cold_pred = bpu.predict(pc_cold, BranchType::DIRECT_COND, true);
+    EXPECT_FALSE(cold_pred.is_branch); // BTB miss
+    EXPECT_EQ(bpu.get_stats().btb_misses, 1);
+
+    // Backend executes cold branch as Taken and updates BTB
+    bpu.update(pc_cold, true, target_cold, BranchType::DIRECT_COND, cold_pred);
+
+    // Next lookup must hit BTB with exact target
+    auto warm_pred = bpu.predict(pc_cold, BranchType::DIRECT_COND, true);
+    EXPECT_TRUE(warm_pred.is_branch);
+    EXPECT_EQ(warm_pred.target_pc, target_cold);
+    EXPECT_EQ(bpu.get_stats().btb_hits, 1);
+
+    // Case 2: Warm branch with BTB hit suffers a Direction Mispredict (Predicted T, Actual NT)
+    for (int i = 0; i < 5; ++i) {
+        auto pred = bpu.predict(pc_dir, BranchType::DIRECT_COND, true);
+        bpu.update(pc_dir, true, target_dir, BranchType::DIRECT_COND, pred);
+    }
+    auto dir_pred = bpu.predict(pc_dir, BranchType::DIRECT_COND, true);
+    EXPECT_TRUE(dir_pred.is_branch);
+    EXPECT_TRUE(dir_pred.taken); // Strongly predicted Taken
+
+    // Actual execution is Not-Taken: Direction misprediction
+    bool actual_dir_taken = false;
+    bool is_dir_mispredict = (dir_pred.taken != actual_dir_taken);
+    EXPECT_TRUE(is_dir_mispredict);
+}
+
+
 
 

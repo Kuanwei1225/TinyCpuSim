@@ -649,6 +649,7 @@ public:
     [[nodiscard]] ReturnAddressStack& get_ras() noexcept { return ras_; }
     [[nodiscard]] BranchTargetBuffer& get_btb() noexcept { return btb_; }
     [[nodiscard]] const BranchStats& get_stats() const noexcept { return stats_; }
+    [[nodiscard]] BranchStats& get_stats() noexcept { return stats_; }
 
 private:
     BranchPredictorConfig config_;

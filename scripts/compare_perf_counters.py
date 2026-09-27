@@ -55,6 +55,8 @@ def parse_gem5_stats(stats_path):
         'bp_returns': raw.get('system.cpu_cluster.cpus.branchPred.lookups_0::Return', 0),
         'bp_squashes': raw.get('system.cpu_cluster.cpus.branchPred.squashes_0::total', 0),
         'bp_committed_mispredicts': raw.get('system.cpu_cluster.cpus.branchPred.mispredicted_0::total', 0),
+        'bp_mispredict_dir': raw.get('system.cpu_cluster.cpus.branchPred.mispredictDueToPredictor_0::total', raw.get('system.cpu_cluster.cpus.branchPred.mispredictDueToPredictor_0::DirectCond', 0)),
+        'bp_mispredict_btb': raw.get('system.cpu_cluster.cpus.branchPred.mispredictDueToBTBMiss_0::total', 0),
         'btb_hits': raw.get('system.cpu_cluster.cpus.branchPred.BTBHits', 0),
         'btb_lookups': raw.get('system.cpu_cluster.cpus.branchPred.BTBLookups', 0),
         'btb_misses': raw.get('system.cpu_cluster.cpus.branchPred.btb.misses::total', 0),
@@ -114,6 +116,15 @@ def parse_tinysim_stats(output_text):
     if m:
         stats['bp_calls'] = int(m.group(1))
         stats['bp_returns'] = int(m.group(2))
+
+    m = re.search(r'Mispredict Dir / BTB:\s+(\d+)\s+/\s+(\d+)', output_text)
+    if m:
+        stats['bp_mispredict_dir'] = int(m.group(1))
+        stats['bp_mispredict_btb'] = int(m.group(2))
+
+    m = re.search(r'Squashed Spec Branches:\s*(\d+)', output_text)
+    if m:
+        stats['bp_squashes'] = int(m.group(1))
 
     m = re.search(r'BTB Hits / Misses:\s+(\d+)\s+/\s+(\d+)', output_text)
     if m:
@@ -226,6 +237,9 @@ def compare_single_workload(elf_name, cfg_path):
         ("Function Calls (BL/BLX)", g.get('bp_calls', 0), t.get('bp_calls', 0), "", False),
         ("Function Returns (BX LR/POP PC)", g.get('bp_returns', 0), t.get('bp_returns', 0), "", False),
         ("Committed Branch Mispredicts", g.get('bp_committed_mispredicts', 0), t.get('bp_committed_mispredicts', 0), "", True),
+        ("Mispredict Due to Direction", g.get('bp_mispredict_dir', 0), t.get('bp_mispredict_dir', 0), "", True),
+        ("Mispredict Due to BTB Miss", g.get('bp_mispredict_btb', 0), t.get('bp_mispredict_btb', 0), "", True),
+        ("Squashed Spec Branches", g.get('bp_squashes', 0), t.get('bp_squashes', 0), "", True),
         ("BTB Hits", g.get('btb_hits', 0), t.get('btb_hits', 0), "", False),
         ("BTB Misses", g.get('btb_misses', 0), t.get('btb_misses', 0), "", True),
         ("RAS Returns Used", g.get('ras_used', 0), t.get('ras_used', 0), "", False),

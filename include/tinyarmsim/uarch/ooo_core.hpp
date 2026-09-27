@@ -472,6 +472,12 @@ private:
                     mispredicted_branch = true;
                     mispredict_uop = uop;
                     mispredict_target = resolved_target;
+
+                    if (actual_taken != uop.pred_taken) {
+                        fetch_unit_.get_branch_predictor().get_stats().mispredict_due_to_direction++;
+                    } else {
+                        fetch_unit_.get_branch_predictor().get_stats().mispredict_due_to_btb_miss++;
+                    }
                 }
             } else if (uop.type == UOpType::STORE_ADDR) {
                 port_lsu_uops_++;
@@ -521,6 +527,12 @@ private:
                         mispredicted_branch = true;
                         mispredict_uop = uop;
                         mispredict_target = actual_target;
+
+                        if (!uop.pred_taken) {
+                            fetch_unit_.get_branch_predictor().get_stats().mispredict_due_to_direction++;
+                        } else {
+                            fetch_unit_.get_branch_predictor().get_stats().mispredict_due_to_btb_miss++;
+                        }
                     }
                 }
             }
@@ -711,6 +723,9 @@ private:
                       << " redirect=0x" << std::hex << redirect_target << std::dec << std::endl;
         }
         rob_.flush_younger_than(branch_uop.rob_idx, [&](const UOp& u) {
+            if (u.is_branch || u.type == UOpType::BRANCH || u.type == UOpType::CALL || u.type == UOpType::RET) {
+                fetch_unit_.get_branch_predictor().get_stats().squashed_branches++;
+            }
             if (u.arch_dest != UOp::INVALID_REG && u.phys_dest >= 17) {
                 free_list_.free(u.phys_dest);
                 prf_.set_ready(u.phys_dest, true);
@@ -724,6 +739,9 @@ private:
         iq_.flush_younger_than(branch_uop.seq_num);
         for (const auto& u : rename_queue_) {
             if (u.seq_num > branch_uop.seq_num) {
+                if (u.is_branch || u.type == UOpType::BRANCH || u.type == UOpType::CALL || u.type == UOpType::RET) {
+                    fetch_unit_.get_branch_predictor().get_stats().squashed_branches++;
+                }
                 if (u.arch_dest != UOp::INVALID_REG && u.phys_dest >= 17) {
                     free_list_.free(u.phys_dest);
                     prf_.set_ready(u.phys_dest, true);

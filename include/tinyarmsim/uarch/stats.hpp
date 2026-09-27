@@ -55,6 +55,11 @@ struct BranchStats {
     uint64_t ras_misses{0};
     uint64_t tage_hits{0};
 
+    // gem5 Aligned Detailed Misprediction Breakdown
+    uint64_t mispredict_due_to_direction{0};
+    uint64_t mispredict_due_to_btb_miss{0};
+    uint64_t squashed_branches{0};
+
     [[nodiscard]] double accuracy() const noexcept {
         return predictions > 0 ? static_cast<double>(correct_predictions) / static_cast<double>(predictions) : 1.0;
     }
@@ -284,6 +289,8 @@ struct UArchStats {
                     << "    Direct Cond / Uncond:  " << c.branch.direct_cond << " / " << c.branch.direct_uncond << "\n"
                     << "    Calls / Returns:       " << c.branch.calls << " / " << c.branch.returns << "\n"
                     << "    Indirect Branches:     " << c.branch.indirects << "\n"
+                    << "    Mispredict Dir / BTB:  " << c.branch.mispredict_due_to_direction << " / " << c.branch.mispredict_due_to_btb_miss << "\n"
+                    << "    Squashed Spec Branches:" << c.branch.squashed_branches << "\n"
                     << "    BTB Hits / Misses:     " << c.branch.btb_hits << " / " << c.branch.btb_misses << " (Hit Rate: " << (c.branch.btb_hit_rate() * 100.0) << "%)\n"
                     << "    RAS Hits / Misses:     " << c.branch.ras_hits << " / " << c.branch.ras_misses << " (Hit Rate: " << (c.branch.ras_hit_rate() * 100.0) << "%)\n"
                     << "    RAS Pushes / Pops:     " << c.branch.ras_pushes << " / " << c.branch.ras_pops << "\n"
