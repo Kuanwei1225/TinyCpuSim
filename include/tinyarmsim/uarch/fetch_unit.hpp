@@ -109,7 +109,7 @@ public:
                     } else if (uop.opcode == Opcode::BLX) {
                         btype = BranchType::INDIRECT_CALL;
                         is_cond = false;
-                    } else if (uop.type == UOpType::RET || (uop.opcode == Opcode::BX && uop.arch_src1 == 14)) {
+                    } else if (uop.type == UOpType::RET || (uop.opcode == Opcode::BX && uop.arch_src1 == ARCH_REG_LR)) {
                         btype = BranchType::RETURN;
                         is_cond = false;
                     } else if (uop.opcode == Opcode::BX) {
@@ -154,6 +154,14 @@ public:
                 break;
             }
         }
+    }
+
+    void record_mispredict(bool is_direction_error) noexcept {
+        branch_pred_.record_mispredict(is_direction_error);
+    }
+
+    void record_squashed_branch() noexcept {
+        branch_pred_.record_squashed_branch();
     }
 
     // Flush front-end on branch misprediction or exception recovery

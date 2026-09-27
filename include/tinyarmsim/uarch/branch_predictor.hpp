@@ -19,6 +19,13 @@ enum class BranchType : uint8_t {
     RETURN
 };
 
+constexpr uint8_t ARCH_REG_LR = 14;
+
+[[nodiscard]] constexpr inline bool is_unconditional_branch(BranchType type) noexcept {
+    return type == BranchType::DIRECT_UNCOND || type == BranchType::DIRECT_CALL ||
+           type == BranchType::INDIRECT_CALL || type == BranchType::INDIRECT_BRANCH;
+}
+
 struct BiModeHistory {
     uint64_t global_history{0};
     bool choice_taken{false};
@@ -536,8 +543,7 @@ public:
 
         if (btb_hit) {
             // Unconditional Direct / Indirect branches & Calls are always taken
-            if (pred.type == BranchType::DIRECT_UNCOND || pred.type == BranchType::DIRECT_CALL ||
-                pred.type == BranchType::INDIRECT_CALL || pred.type == BranchType::INDIRECT_BRANCH) {
+            if (is_unconditional_branch(pred.type)) {
                 pred.taken = true;
                 pred.target_pc = btb_target;
                 return pred;
@@ -545,8 +551,7 @@ public:
         }
 
         if (!is_cond_branch) {
-            pred.taken = (pred.type == BranchType::DIRECT_UNCOND || pred.type == BranchType::DIRECT_CALL ||
-                          pred.type == BranchType::INDIRECT_CALL || pred.type == BranchType::INDIRECT_BRANCH);
+            pred.taken = is_unconditional_branch(pred.type);
             pred.target_pc = btb_hit ? btb_target : (pc + 2);
             return pred;
         }
@@ -639,6 +644,18 @@ public:
         }
     }
 
+    void record_mispredict(bool is_direction_error) noexcept {
+        if (is_direction_error) {
+            stats_.mispredict_due_to_direction++;
+        } else {
+            stats_.mispredict_due_to_btb_miss++;
+        }
+    }
+
+    void record_squashed_branch() noexcept {
+        stats_.squashed_branches++;
+    }
+
     void reset() {
         bimodal_.reset();
         bimode_.reset();
@@ -652,7 +669,6 @@ public:
     [[nodiscard]] ReturnAddressStack& get_ras() noexcept { return ras_; }
     [[nodiscard]] BranchTargetBuffer& get_btb() noexcept { return btb_; }
     [[nodiscard]] const BranchStats& get_stats() const noexcept { return stats_; }
-    [[nodiscard]] BranchStats& get_stats() noexcept { return stats_; }
 
 private:
     BranchPredictorConfig config_;
