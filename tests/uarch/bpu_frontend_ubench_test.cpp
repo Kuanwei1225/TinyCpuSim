@@ -385,3 +385,58 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_CallReturnPreservesConditionalGHR) {
     EXPECT_EQ(post_call_pred.target_pc, cond_target);
 }
 
+// 8. Isolation Test: Bi-Mode table separation prevents destructive aliasing between biased Taken and biased Not-Taken branches
+TEST(BpuFrontendUBenchTest, BPU_UBench_BiModeInterferenceFiltering) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL; // BiModeBP
+    cfg.table_size = 2048;
+    cfg.btb_size = 512;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    const uint32_t pc_taken_bias = 0x1004;
+    const uint32_t target_taken = 0x1040;
+    const uint32_t pc_not_taken_bias = 0x2004;
+
+    // Warm-up: Train pc_taken_bias as 100% Taken, and pc_not_taken_bias as 100% Not-Taken
+    for (int i = 0; i < 30; ++i) {
+        // Step A: Branch A (Taken)
+        auto pred_a = bpu.predict(pc_taken_bias, BranchType::DIRECT_COND, true);
+        bpu.update(pc_taken_bias, true, target_taken, BranchType::DIRECT_COND, pred_a);
+        if (!pred_a.taken) {
+            bpu.squash(pred_a, true);
+        }
+
+        // Step B: Branch B (Not Taken)
+        auto pred_b = bpu.predict(pc_not_taken_bias, BranchType::DIRECT_COND, true);
+        bpu.update(pc_not_taken_bias, false, pc_not_taken_bias + 4, BranchType::DIRECT_COND, pred_b);
+        if (pred_b.taken) {
+            bpu.squash(pred_b, false);
+        }
+    }
+
+    // Steady-state evaluation: Interleave 50 pairs of A and B
+    int correct_a = 0;
+    int correct_b = 0;
+    for (int i = 0; i < 50; ++i) {
+        // Interleaved A
+        auto pred_a = bpu.predict(pc_taken_bias, BranchType::DIRECT_COND, true);
+        if (pred_a.taken && pred_a.target_pc == target_taken) {
+            correct_a++;
+        }
+        bpu.update(pc_taken_bias, true, target_taken, BranchType::DIRECT_COND, pred_a);
+
+        // Interleaved B
+        auto pred_b = bpu.predict(pc_not_taken_bias, BranchType::DIRECT_COND, true);
+        if (!pred_b.taken) {
+            correct_b++;
+        }
+        bpu.update(pc_not_taken_bias, false, pc_not_taken_bias + 4, BranchType::DIRECT_COND, pred_b);
+    }
+
+    // Bi-Mode must filter interference completely (100% accuracy, 0% error)
+    EXPECT_EQ(correct_a, 50);
+    EXPECT_EQ(correct_b, 50);
+}
+
+
