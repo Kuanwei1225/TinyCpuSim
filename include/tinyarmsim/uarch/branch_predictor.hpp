@@ -44,6 +44,7 @@ struct BranchPrediction {
     uint32_t predictor_meta{0};
     int8_t provider_table{-1};
     bool alt_used{false};
+    bool alt_taken{false};
     BiModeHistory bimode_hist{};
 };
 
@@ -569,6 +570,7 @@ public:
                 auto tage_res = tage_.predict(pc);
                 dir_taken = tage_res.taken;
                 pred.provider_table = static_cast<int8_t>(tage_res.provider_table);
+                pred.alt_taken = tage_res.alt_taken;
                 pred.alt_used = (tage_res.provider_table != -1 && tage_res.taken != tage_res.alt_taken);
                 if (tage_res.provider_table != -1) {
                     stats_.tage_hits++;
@@ -613,6 +615,7 @@ public:
                     TagePredictor::PredictionResult tage_res;
                     tage_res.taken = pred.taken;
                     tage_res.provider_table = pred.provider_table;
+                    tage_res.alt_taken = pred.alt_taken;
                     tage_.update(pc, taken, tage_res);
                     break;
                 }

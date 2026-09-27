@@ -167,7 +167,7 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_CorrelatedBranchesTAGE) {
         if (p2.taken == t2) accurate_count++;
         bpu.update(br2, t2, t2 ? 0x3080 : br2 + 4, BranchType::DIRECT_COND, p2);
     }
-    EXPECT_GE(accurate_count, 850);
+    EXPECT_EQ(accurate_count, 1000);
 }
 
 // 6. BTB hash index aliasing stress
