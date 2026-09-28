@@ -65,7 +65,19 @@ TinyCpuSim has minimal external dependencies and runs on macOS and Linux.
 - **Operating System**: macOS (Apple Silicon / Intel) or Linux (Ubuntu 20.04+, Debian, Fedora, Arch).
 - **C++ Compiler**: Clang (`clang++ >= 11` / Apple Clang 13+) or GCC (`g++ >= 9`) with C++17 support.
 - **Build System**: CMake `>= 3.15` and Make or Ninja.
-- **Python**: Python 3.8+ (used for parameter experiments, TUI configuration, and gem5 regression).
+- **Cross Compiler**: `arm-none-eabi-gcc` (for building Thumb-2 assembly test fixtures).
+- **Python**: Python 3.8+ (with `keystone-engine`, `pyelftools`, `capstone`).
+
+### Automated Dependency Installation
+
+Install all required build tools and Python packages with one command:
+```bash
+./run.sh setup
+# or directly: ./scripts/install_deps.sh
+```
+
+> **gem5 Oracle Dependency Notice (Optional)**:  
+> **gem5 is strictly OPTIONAL**. TinyCpuSim embeds pre-cached empirical golden baselines in `tests/golden/gem5/` and `tests/uarch/golden_counters.json`. gem5 is **NOT** required for building the simulator, running unit tests, executing component ubenchmarks, or performing microarchitecture sweeps. For instructions on installing and compiling gem5 ARM from source, see [gem5 Setup & Calibration Guide](docs/gem5_setup.md).
 
 ---
 

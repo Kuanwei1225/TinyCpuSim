@@ -42,6 +42,7 @@ show_help() {
     echo "Catalogs & Utilities:"
     echo "  ./run.sh knobs                      # List all tunable hardware parameters & units"
     echo "  ./run.sh elfs                       # List all built-in benchmark ELF workloads"
+    echo "  ./run.sh setup                      # Install required system & Python dependencies"
     echo "  ./run.sh clean                      # Clean build artifacts"
     echo "============================================================"
 }
@@ -120,6 +121,9 @@ else
             ;;
         elfs|list-elfs)
             python3 "${PROJECT_ROOT}/scripts/experiment.py" --list-elfs
+            ;;
+        setup|deps|install-deps)
+            "${PROJECT_ROOT}/scripts/install_deps.sh" "$@"
             ;;
         clean)
             echo "Cleaning build directory..."

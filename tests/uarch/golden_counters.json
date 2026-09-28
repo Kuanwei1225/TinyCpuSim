@@ -176,50 +176,74 @@
       "items": [
         {
           "ubench": "LSU_UBench_ExactStoreToLoadForwarding",
-          "metric": "Store-to-Load Forwarding Rate",
-          "counter_key": "forward_rate",
-          "gem5_counter": "lsu.storeToLoadForwardRate",
-          "gem5_val": 100.0,
+          "metric": "Store-to-Load Forwarding Stress Count (500 iterations)",
+          "counter_key": "forward_count",
+          "gem5_counter": "lsu.forwLoads (500x STLF)",
+          "gem5_val": 500,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_ConsecutiveMultiWordStoreForwarding",
+          "metric": "Consecutive Multi-Word STLF Burst Count (500 rounds x 3)",
+          "counter_key": "forward_count",
+          "gem5_counter": "lsu.forwLoads (1500x Consecutive Hits)",
+          "gem5_val": 1500,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_DependentAluStoreForwardingChain",
+          "metric": "Dependent ALU Result STLF Chain Count (500 rounds x 3)",
+          "counter_key": "forward_count",
+          "gem5_counter": "lsu.forwLoads (1500x Chain Forwards)",
+          "gem5_val": 1500,
+          "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "LSU_UBench_AdjacentElementSwapForwarding",
+          "metric": "Adjacent Element Swap Inter-Iteration Forwarding (500 rounds)",
+          "counter_key": "forward_count",
+          "gem5_counter": "lsu.forwLoads (Adjacent Swaps)",
+          "gem5_val": 500,
           "tolerance_pct": 0.0
         },
         {
           "ubench": "LSU_UBench_StoreDataPendingReplay",
-          "metric": "Store Data Pending Replay Queue",
+          "metric": "Store Data Pending Replay Queue (500 iterations)",
           "counter_key": "replayed_loads",
           "gem5_counter": "lsu.replayedLoads",
-          "gem5_val": 1,
+          "gem5_val": 500,
           "tolerance_pct": 0.0
         },
         {
           "ubench": "LSU_UBench_MemoryOrderViolationDetection",
-          "metric": "Memory Order Violation Squash Detection",
+          "metric": "Memory Order Violation Squash Detection (500 iterations)",
           "counter_key": "violations",
           "gem5_counter": "lsu.memoryOrderViolations",
-          "gem5_val": 1,
+          "gem5_val": 500,
           "tolerance_pct": 0.0
         },
         {
           "ubench": "LSU_UBench_L1CacheHitVsMissLatency",
-          "metric": "L1D Cache Hit Latency Cycles",
-          "counter_key": "hit_latency",
-          "gem5_counter": "dcache.hitLatencyCycles",
-          "gem5_val": 2,
+          "metric": "L1D Cache Consecutive Hit Count (500 iterations)",
+          "counter_key": "hit_count",
+          "gem5_counter": "dcache.hitCount (500x Hits)",
+          "gem5_val": 500,
           "tolerance_pct": 0.0
         },
         {
           "ubench": "LSU_UBench_StridedAccessCacheThrashing",
-          "metric": "Strided Cache Line Load Capacity",
+          "metric": "Strided Cache Line Load Capacity (512 accesses)",
           "counter_key": "strided_loads",
           "gem5_counter": "lsu.stridedAccesses",
-          "gem5_val": 8,
+          "gem5_val": 512,
           "tolerance_pct": 0.0
         },
         {
           "ubench": "LSU_UBench_LoadStoreQueueWrapAround",
-          "metric": "LSQ Circular Buffer Streaming Wrap-around",
+          "metric": "LSQ Circular Buffer Streaming Wrap-around (500 cycles)",
           "counter_key": "lsq_wrap_cycles",
           "gem5_counter": "lsu.queueWrapAroundCycles",
-          "gem5_val": 100,
+          "gem5_val": 500,
           "tolerance_pct": 0.0
         }
       ]

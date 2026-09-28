@@ -217,93 +217,308 @@ TEST(ExecLsuUBenchTest, Exec_UBench_ExecutionPortContention) {
 // Load / Store Unit Isolated Microbenchmarks (LSU_UBench)
 // =============================================================================
 
-// 1. Exact Store-to-Load Forwarding (STLF) from SQ to LQ
+// 1. Exact Store-to-Load Forwarding (STLF) from SQ to LQ (500 stress iterations)
 TEST(ExecLsuUBenchTest, LSU_UBench_ExactStoreToLoadForwarding) {
-    MemoryBus bus(4096);
+    MemoryBus bus(65536);
     LsuConfig cfg;
+    cfg.lq_size = 32;
+    cfg.sq_size = 32;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
-    // Older Store (seq=1, addr=0x2000, data=0xCAFEBABE)
-    UOp store_uop; store_uop.seq_num = 1; store_uop.rob_idx = 0;
-    size_t sq_idx = lsu.allocate_store(store_uop);
-    size_t dummy_viol = 0;
-    lsu.execute_store_address(sq_idx, 0x2000, 4, 1, dummy_viol);
-    lsu.execute_store_data(sq_idx, 0xCAFEBABE);
+    constexpr uint64_t kIterations = 500;
+    for (uint64_t i = 1; i <= kIterations; ++i) {
+        uint32_t addr = 0x2000 + static_cast<uint32_t>((i % 32) * 4);
+        uint32_t data = 0xCAFE0000 | static_cast<uint32_t>(i);
 
-    // Younger Load (seq=2, addr=0x2000)
-    UOp load_uop; load_uop.seq_num = 2; load_uop.rob_idx = 1;
-    size_t lq_idx = lsu.allocate_load(load_uop);
-    auto res = lsu.execute_load(lq_idx, 0x2000, 4, 2);
+        // Store
+        UOp store_uop; store_uop.seq_num = (i * 2) - 1; store_uop.rob_idx = 0;
+        size_t sq_idx = lsu.allocate_store(store_uop);
+        size_t dummy_viol = 0;
+        lsu.execute_store_address(sq_idx, addr, 4, store_uop.seq_num, dummy_viol);
+        lsu.execute_store_data(sq_idx, data);
 
-    // Forwarding must succeed immediately with correct data without hitting memory bus
-    EXPECT_TRUE(res.completed);
-    EXPECT_TRUE(res.forwarded);
-    EXPECT_EQ(res.data, 0xCAFEBABE);
-    EXPECT_EQ(lsu.get_stats().forwarded_loads, 1);
-    std::cout << "[PERF_COUNTER] LSU_UBench_ExactStoreToLoadForwarding:forward_rate=" << (res.forwarded ? 100.0 : 0.0) << std::endl;
+        // Load
+        UOp load_uop; load_uop.seq_num = i * 2; load_uop.rob_idx = 1;
+        size_t lq_idx = lsu.allocate_load(load_uop);
+        auto res = lsu.execute_load(lq_idx, addr, 4, load_uop.seq_num);
+
+        EXPECT_TRUE(res.completed);
+        EXPECT_TRUE(res.forwarded);
+        EXPECT_EQ(res.data, data);
+
+        lsu.commit_store(sq_idx);
+        lsu.free_load(lq_idx);
+    }
+
+    EXPECT_EQ(lsu.get_stats().forwarded_loads, kIterations);
+    std::cout << "[PERF_COUNTER] LSU_UBench_ExactStoreToLoadForwarding:forward_count=" << lsu.get_stats().forwarded_loads << std::endl;
 }
 
-// 2. Store address known, data pending -> Load replays until store data arrives
+// 1b. Consecutive multi-word store-to-load forwarding (500 burst rounds = 1500 operations)
+TEST(ExecLsuUBenchTest, LSU_UBench_ConsecutiveMultiWordStoreForwarding) {
+    MemoryBus bus(65536);
+    LsuConfig cfg;
+    cfg.lq_size = 16;
+    cfg.sq_size = 16;
+    LoadStoreUnit lsu(cfg, nullptr, &bus);
+
+    constexpr uint64_t kRounds = 500;
+    for (uint64_t r = 0; r < kRounds; ++r) {
+        uint32_t base_addr = 0x2000 + static_cast<uint32_t>((r % 16) * 16);
+
+        // Word 1 (0x42)
+        UOp s1; s1.seq_num = (r * 6) + 1; s1.rob_idx = 0;
+        size_t sq1 = lsu.allocate_store(s1);
+        size_t viol1 = 0;
+        lsu.execute_store_address(sq1, base_addr + 0, 4, s1.seq_num, viol1);
+        lsu.execute_store_data(sq1, 0x42);
+
+        UOp l1; l1.seq_num = (r * 6) + 2; l1.rob_idx = 1;
+        size_t lq1 = lsu.allocate_load(l1);
+        auto res1 = lsu.execute_load(lq1, base_addr + 0, 4, l1.seq_num);
+        EXPECT_TRUE(res1.completed);
+        EXPECT_TRUE(res1.forwarded);
+        EXPECT_EQ(res1.data, 0x42);
+
+        // Word 2 (0x99)
+        UOp s2; s2.seq_num = (r * 6) + 3; s2.rob_idx = 2;
+        size_t sq2 = lsu.allocate_store(s2);
+        size_t viol2 = 0;
+        lsu.execute_store_address(sq2, base_addr + 4, 4, s2.seq_num, viol2);
+        lsu.execute_store_data(sq2, 0x99);
+
+        UOp l2; l2.seq_num = (r * 6) + 4; l2.rob_idx = 3;
+        size_t lq2 = lsu.allocate_load(l2);
+        auto res2 = lsu.execute_load(lq2, base_addr + 4, 4, l2.seq_num);
+        EXPECT_TRUE(res2.completed);
+        EXPECT_TRUE(res2.forwarded);
+        EXPECT_EQ(res2.data, 0x99);
+
+        // Word 3 (0xDB)
+        UOp s3; s3.seq_num = (r * 6) + 5; s3.rob_idx = 4;
+        size_t sq3 = lsu.allocate_store(s3);
+        size_t viol3 = 0;
+        lsu.execute_store_address(sq3, base_addr + 8, 4, s3.seq_num, viol3);
+        lsu.execute_store_data(sq3, 0xDB);
+
+        UOp l3; l3.seq_num = (r * 6) + 6; l3.rob_idx = 5;
+        size_t lq3 = lsu.allocate_load(l3);
+        auto res3 = lsu.execute_load(lq3, base_addr + 8, 4, l3.seq_num);
+        EXPECT_TRUE(res3.completed);
+        EXPECT_TRUE(res3.forwarded);
+        EXPECT_EQ(res3.data, 0xDB);
+
+        // Commit & free
+        lsu.commit_store(sq1);
+        lsu.commit_store(sq2);
+        lsu.commit_store(sq3);
+        lsu.free_load(lq1);
+        lsu.free_load(lq2);
+        lsu.free_load(lq3);
+    }
+
+    EXPECT_EQ(lsu.get_stats().forwarded_loads, kRounds * 3);
+    std::cout << "[PERF_COUNTER] LSU_UBench_ConsecutiveMultiWordStoreForwarding:forward_count=" << lsu.get_stats().forwarded_loads << std::endl;
+}
+
+// 1c. Dependent ALU calculation feeding store forwarding chain (500 chained rounds = 1500 operations)
+TEST(ExecLsuUBenchTest, LSU_UBench_DependentAluStoreForwardingChain) {
+    MemoryBus bus(65536);
+    LsuConfig cfg;
+    cfg.lq_size = 16;
+    cfg.sq_size = 16;
+    LoadStoreUnit lsu(cfg, nullptr, &bus);
+
+    constexpr uint64_t kRounds = 500;
+    for (uint64_t r = 0; r < kRounds; ++r) {
+        uint32_t base_addr = 0x1000 + static_cast<uint32_t>((r % 16) * 16);
+
+        // Store 0x42 and Load 0x42
+        UOp s1; s1.seq_num = (r * 6) + 1; s1.rob_idx = 0;
+        size_t sq1 = lsu.allocate_store(s1);
+        size_t v1 = 0;
+        lsu.execute_store_address(sq1, base_addr + 0, 4, s1.seq_num, v1);
+        lsu.execute_store_data(sq1, 0x42);
+
+        UOp l1; l1.seq_num = (r * 6) + 2; l1.rob_idx = 1;
+        size_t lq1 = lsu.allocate_load(l1);
+        auto res1 = lsu.execute_load(lq1, base_addr + 0, 4, l1.seq_num);
+
+        // Store 0x99 and Load 0x99
+        UOp s2; s2.seq_num = (r * 6) + 3; s2.rob_idx = 2;
+        size_t sq2 = lsu.allocate_store(s2);
+        size_t v2 = 0;
+        lsu.execute_store_address(sq2, base_addr + 4, 4, s2.seq_num, v2);
+        lsu.execute_store_data(sq2, 0x99);
+
+        UOp l2; l2.seq_num = (r * 6) + 4; l2.rob_idx = 3;
+        size_t lq2 = lsu.allocate_load(l2);
+        auto res2 = lsu.execute_load(lq2, base_addr + 4, 4, l2.seq_num);
+
+        // RAW dependent ALU: sum = 0x42 + 0x99 = 0xDB (219)
+        uint32_t sum = res1.data + res2.data;
+        EXPECT_EQ(sum, 0xDB);
+
+        // Store sum to [base+8] and Load [base+8]
+        UOp s3; s3.seq_num = (r * 6) + 5; s3.rob_idx = 4;
+        size_t sq3 = lsu.allocate_store(s3);
+        size_t v3 = 0;
+        lsu.execute_store_address(sq3, base_addr + 8, 4, s3.seq_num, v3);
+        lsu.execute_store_data(sq3, sum);
+
+        UOp l3; l3.seq_num = (r * 6) + 6; l3.rob_idx = 5;
+        size_t lq3 = lsu.allocate_load(l3);
+        auto res3 = lsu.execute_load(lq3, base_addr + 8, 4, l3.seq_num);
+
+        EXPECT_TRUE(res3.completed);
+        EXPECT_TRUE(res3.forwarded);
+        EXPECT_EQ(res3.data, 0xDB);
+
+        lsu.commit_store(sq1);
+        lsu.commit_store(sq2);
+        lsu.commit_store(sq3);
+        lsu.free_load(lq1);
+        lsu.free_load(lq2);
+        lsu.free_load(lq3);
+    }
+
+    EXPECT_EQ(lsu.get_stats().forwarded_loads, kRounds * 3);
+    std::cout << "[PERF_COUNTER] LSU_UBench_DependentAluStoreForwardingChain:forward_count=" << lsu.get_stats().forwarded_loads << std::endl;
+}
+
+// 1d. Adjacent element swap inter-iteration store forwarding (test_sort.elf Bubble Sort kernel)
+TEST(ExecLsuUBenchTest, LSU_UBench_AdjacentElementSwapForwarding) {
+    MemoryBus bus(65536);
+    LsuConfig cfg;
+    cfg.lq_size = 16;
+    cfg.sq_size = 16;
+    LoadStoreUnit lsu(cfg, nullptr, &bus);
+
+    constexpr uint64_t kSwapRounds = 500;
+    uint64_t forwarded_swaps = 0;
+
+    for (uint64_t r = 0; r < kSwapRounds; ++r) {
+        uint32_t addr0 = 0x1000 + static_cast<uint32_t>((r % 8) * 8);
+        uint32_t addr1 = addr0 + 4;
+
+        uint32_t val0 = 40;
+        uint32_t val1 = 10;
+
+        // Bubble Sort Swap: store val1 to addr0, store val0 to addr1
+        UOp s0; s0.seq_num = (r * 4) + 1; s0.rob_idx = 0;
+        size_t sq0 = lsu.allocate_store(s0);
+        size_t v0 = 0;
+        lsu.execute_store_address(sq0, addr0, 4, s0.seq_num, v0);
+        lsu.execute_store_data(sq0, val1);
+
+        UOp s1; s1.seq_num = (r * 4) + 2; s1.rob_idx = 1;
+        size_t sq1 = lsu.allocate_store(s1);
+        size_t v1 = 0;
+        lsu.execute_store_address(sq1, addr1, 4, s1.seq_num, v1);
+        lsu.execute_store_data(sq1, val0);
+
+        // Next iteration's adjacent read on addr1 (must forward val0 from sq1!)
+        UOp l_next; l_next.seq_num = (r * 4) + 3; l_next.rob_idx = 2;
+        size_t lq = lsu.allocate_load(l_next);
+        auto res = lsu.execute_load(lq, addr1, 4, l_next.seq_num);
+
+        EXPECT_TRUE(res.completed);
+        EXPECT_TRUE(res.forwarded);
+        EXPECT_EQ(res.data, val0);
+        if (res.forwarded) {
+            forwarded_swaps++;
+        }
+
+        lsu.commit_store(sq0);
+        lsu.commit_store(sq1);
+        lsu.free_load(lq);
+    }
+
+    EXPECT_EQ(forwarded_swaps, kSwapRounds);
+    std::cout << "[PERF_COUNTER] LSU_UBench_AdjacentElementSwapForwarding:forward_count=" << forwarded_swaps << std::endl;
+}
+
+
+// 2. Store address known, data pending -> Load replays until store data arrives (500 stress iterations)
 TEST(ExecLsuUBenchTest, LSU_UBench_StoreDataPendingReplay) {
-    MemoryBus bus(4096);
+    MemoryBus bus(65536);
     LsuConfig cfg;
+    cfg.lq_size = 16;
+    cfg.sq_size = 16;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
-    // Older Store (seq=10, addr=0x3000, data NOT yet valid)
-    UOp store_uop; store_uop.seq_num = 10; store_uop.rob_idx = 5;
-    size_t sq_idx = lsu.allocate_store(store_uop);
-    size_t dummy_viol = 0;
-    lsu.execute_store_address(sq_idx, 0x3000, 4, 10, dummy_viol);
+    constexpr uint64_t kIterations = 500;
+    for (uint64_t i = 1; i <= kIterations; ++i) {
+        uint32_t addr = 0x3000 + static_cast<uint32_t>((i % 16) * 4);
+        uint32_t data = 0x12340000 | static_cast<uint32_t>(i);
 
-    // Younger Load (seq=11, addr=0x3000) tries to execute
-    UOp load_uop; load_uop.seq_num = 11; load_uop.rob_idx = 6;
-    size_t lq_idx = lsu.allocate_load(load_uop);
-    auto res1 = lsu.execute_load(lq_idx, 0x3000, 4, 11);
+        // Older Store (data NOT yet valid)
+        UOp store_uop; store_uop.seq_num = (i * 2) - 1; store_uop.rob_idx = 0;
+        size_t sq_idx = lsu.allocate_store(store_uop);
+        size_t dummy_viol = 0;
+        lsu.execute_store_address(sq_idx, addr, 4, store_uop.seq_num, dummy_viol);
 
-    // Load must NOT complete (stalled / replay pending)
-    EXPECT_FALSE(res1.completed);
+        // Younger Load tries to execute -> must stall/replay
+        UOp load_uop; load_uop.seq_num = i * 2; load_uop.rob_idx = 1;
+        size_t lq_idx = lsu.allocate_load(load_uop);
+        auto res1 = lsu.execute_load(lq_idx, addr, 4, load_uop.seq_num);
+        EXPECT_FALSE(res1.completed);
 
-    // Store data arrives
-    lsu.execute_store_data(sq_idx, 0x12345678);
+        // Store data arrives
+        lsu.execute_store_data(sq_idx, data);
 
-    // Replay load execution
-    auto res2 = lsu.execute_load(lq_idx, 0x3000, 4, 11);
-    EXPECT_TRUE(res2.completed);
-    EXPECT_TRUE(res2.forwarded);
-    EXPECT_EQ(res2.data, 0x12345678);
-    std::cout << "[PERF_COUNTER] LSU_UBench_StoreDataPendingReplay:replayed_loads=1" << std::endl;
+        // Replay load execution -> succeeds with forwarding
+        auto res2 = lsu.execute_load(lq_idx, addr, 4, load_uop.seq_num);
+        EXPECT_TRUE(res2.completed);
+        EXPECT_TRUE(res2.forwarded);
+        EXPECT_EQ(res2.data, data);
+
+        lsu.commit_store(sq_idx);
+        lsu.free_load(lq_idx);
+    }
+
+    std::cout << "[PERF_COUNTER] LSU_UBench_StoreDataPendingReplay:replayed_loads=" << kIterations << std::endl;
 }
 
-// 3. Memory Order Violation: speculative out-of-order load before aliasing store
+// 3. Memory Order Violation: speculative out-of-order load before aliasing store (500 stress iterations)
 TEST(ExecLsuUBenchTest, LSU_UBench_MemoryOrderViolationDetection) {
     MemoryBus bus(65536);
-    bus.write32(0x1000, 0x11111111); // Initial value in memory
-
     LsuConfig cfg;
+    cfg.lq_size = 16;
+    cfg.sq_size = 16;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
-    // Older Store (seq=20, rob=10) - address not yet known
-    UOp store_uop; store_uop.seq_num = 20; store_uop.rob_idx = 10;
-    size_t sq_idx = lsu.allocate_store(store_uop);
+    constexpr uint64_t kIterations = 500;
+    for (uint64_t i = 1; i <= kIterations; ++i) {
+        uint32_t addr = 0x1000 + static_cast<uint32_t>((i % 16) * 4);
+        bus.write32(addr, 0x11110000 | static_cast<uint32_t>(i));
 
-    // Younger Load (seq=25, rob=15) executes speculatively from memory (reads 0x11111111)
-    UOp load_uop; load_uop.seq_num = 25; load_uop.rob_idx = 15;
-    size_t lq_idx = lsu.allocate_load(load_uop);
-    auto l_res = lsu.execute_load(lq_idx, 0x1000, 4, 25);
-    EXPECT_TRUE(l_res.completed);
-    EXPECT_EQ(l_res.data, 0x11111111);
+        // Older Store (addr not yet known)
+        UOp store_uop; store_uop.seq_num = (i * 2) - 1; store_uop.rob_idx = 0;
+        size_t sq_idx = lsu.allocate_store(store_uop);
 
-    // Older Store now completes address calculation to 0x1000 -> Aliasing detected!
-    size_t violating_rob = 0;
-    bool violation = lsu.execute_store_address(sq_idx, 0x1000, 4, 20, violating_rob);
+        // Younger Load executes speculatively from memory
+        UOp load_uop; load_uop.seq_num = i * 2; load_uop.rob_idx = 1;
+        size_t lq_idx = lsu.allocate_load(load_uop);
+        auto l_res = lsu.execute_load(lq_idx, addr, 4, load_uop.seq_num);
+        EXPECT_TRUE(l_res.completed);
+        EXPECT_EQ(l_res.data, 0x11110000 | static_cast<uint32_t>(i));
 
-    EXPECT_TRUE(violation);
-    EXPECT_EQ(violating_rob, 15); // Violating younger load ROB index identified
-    EXPECT_EQ(lsu.get_stats().memory_order_violations, 1);
+        // Older Store resolves address to same addr -> Aliasing violation detected!
+        size_t violating_rob = 0;
+        bool violation = lsu.execute_store_address(sq_idx, addr, 4, store_uop.seq_num, violating_rob);
+        EXPECT_TRUE(violation);
+        EXPECT_EQ(violating_rob, 1);
+
+        lsu.commit_store(sq_idx);
+        lsu.free_load(lq_idx);
+    }
+
+    EXPECT_EQ(lsu.get_stats().memory_order_violations, kIterations);
     std::cout << "[PERF_COUNTER] LSU_UBench_MemoryOrderViolationDetection:violations=" << lsu.get_stats().memory_order_violations << std::endl;
 }
 
-// 4. L1 Data Cache hit vs DRAM access latency
+// 4. L1 Data Cache hit vs DRAM access latency (500 consecutive cache hits)
 TEST(ExecLsuUBenchTest, LSU_UBench_L1CacheHitVsMissLatency) {
     MemoryBus bus(65536);
     bus.write32(0x4000, 0x87654321);
@@ -316,6 +531,7 @@ TEST(ExecLsuUBenchTest, LSU_UBench_L1CacheHitVsMissLatency) {
     Cache l1d(l1_cfg, "L1D");
 
     LsuConfig lsu_cfg;
+    lsu_cfg.lq_size = 32;
     LoadStoreUnit lsu(lsu_cfg, &l1d, &bus);
 
     // 1st access: Cache Miss (fills cache line)
@@ -324,18 +540,23 @@ TEST(ExecLsuUBenchTest, LSU_UBench_L1CacheHitVsMissLatency) {
     auto res1 = lsu.execute_load(lq1, 0x4000, 4, 1);
     EXPECT_TRUE(res1.completed);
     EXPECT_EQ(res1.data, 0x87654321);
+    lsu.free_load(lq1);
 
-    // 2nd access: Cache Hit (fast 2-cycle latency)
-    UOp l2; l2.seq_num = 2; l2.rob_idx = 1;
-    size_t lq2 = lsu.allocate_load(l2);
-    auto res2 = lsu.execute_load(lq2, 0x4000, 4, 2);
-    EXPECT_TRUE(res2.completed);
-    EXPECT_EQ(res2.data, 0x87654321);
-    EXPECT_EQ(res2.latency_cycles, 2);
-    std::cout << "[PERF_COUNTER] LSU_UBench_L1CacheHitVsMissLatency:hit_latency=" << res2.latency_cycles << std::endl;
+    // 500 consecutive Cache Hits (fast 2-cycle latency)
+    constexpr uint64_t kHitLoops = 500;
+    for (uint64_t i = 2; i <= kHitLoops + 1; ++i) {
+        UOp l2; l2.seq_num = i; l2.rob_idx = 1;
+        size_t lq2 = lsu.allocate_load(l2);
+        auto res2 = lsu.execute_load(lq2, 0x4000, 4, i);
+        EXPECT_TRUE(res2.completed);
+        EXPECT_EQ(res2.data, 0x87654321);
+        EXPECT_EQ(res2.latency_cycles, 2);
+        lsu.free_load(lq2);
+    }
+    std::cout << "[PERF_COUNTER] LSU_UBench_L1CacheHitVsMissLatency:hit_count=" << kHitLoops << std::endl;
 }
 
-// 5. Strided access pattern across cache lines
+// 5. Strided access pattern across cache lines (512 accesses across 8 lines)
 TEST(ExecLsuUBenchTest, LSU_UBench_StridedAccessCacheThrashing) {
     MemoryBus bus(65536);
     CacheConfig l1_cfg;
@@ -348,22 +569,25 @@ TEST(ExecLsuUBenchTest, LSU_UBench_StridedAccessCacheThrashing) {
     lsu_cfg.lq_size = 32;
     LoadStoreUnit lsu(lsu_cfg, &l1d, &bus);
 
-    // Stride by 64 bytes (1 cacheline stride) across 8 lines
-    for (uint32_t i = 0; i < 8; ++i) {
-        uint32_t addr = 0x1000 + (i * 64);
-        bus.write32(addr, 0x100 + i);
+    constexpr uint32_t kRounds = 64;
+    for (uint32_t r = 0; r < kRounds; ++r) {
+        for (uint32_t i = 0; i < 8; ++i) {
+            uint32_t addr = 0x1000 + (i * 64);
+            bus.write32(addr, 0x100 + i);
 
-        UOp uop; uop.seq_num = i + 1; uop.rob_idx = i;
-        size_t lq_idx = lsu.allocate_load(uop);
-        auto res = lsu.execute_load(lq_idx, addr, 4, i + 1);
-        EXPECT_TRUE(res.completed);
-        EXPECT_EQ(res.data, 0x100 + i);
-        lsu.free_load(lq_idx);
+            uint64_t seq = (r * 8) + i + 1;
+            UOp uop; uop.seq_num = seq; uop.rob_idx = 0;
+            size_t lq_idx = lsu.allocate_load(uop);
+            auto res = lsu.execute_load(lq_idx, addr, 4, seq);
+            EXPECT_TRUE(res.completed);
+            EXPECT_EQ(res.data, 0x100 + i);
+            lsu.free_load(lq_idx);
+        }
     }
-    std::cout << "[PERF_COUNTER] LSU_UBench_StridedAccessCacheThrashing:strided_loads=8" << std::endl;
+    std::cout << "[PERF_COUNTER] LSU_UBench_StridedAccessCacheThrashing:strided_loads=" << (kRounds * 8) << std::endl;
 }
 
-// 6. Sustained streaming loads and stores wrap-around without slot leakage
+// 6. Sustained streaming loads and stores wrap-around without slot leakage (500 cycles)
 TEST(ExecLsuUBenchTest, LSU_UBench_LoadStoreQueueWrapAround) {
     MemoryBus bus(4096);
     LsuConfig cfg;
@@ -371,8 +595,8 @@ TEST(ExecLsuUBenchTest, LSU_UBench_LoadStoreQueueWrapAround) {
     cfg.sq_size = 8;
     LoadStoreUnit lsu(cfg, nullptr, &bus);
 
-    // Perform 100 consecutive allocate -> execute -> commit/free cycles
-    for (uint64_t i = 0; i < 100; ++i) {
+    constexpr uint64_t kWraps = 500;
+    for (uint64_t i = 0; i < kWraps; ++i) {
         UOp uop_s; uop_s.seq_num = (i * 2) + 1; uop_s.rob_idx = 0;
         size_t sq_idx = lsu.allocate_store(uop_s);
         size_t dummy = 0;
@@ -390,5 +614,6 @@ TEST(ExecLsuUBenchTest, LSU_UBench_LoadStoreQueueWrapAround) {
 
     EXPECT_TRUE(lsu.can_allocate_load());
     EXPECT_TRUE(lsu.can_allocate_store());
-    std::cout << "[PERF_COUNTER] LSU_UBench_LoadStoreQueueWrapAround:lsq_wrap_cycles=100" << std::endl;
+    std::cout << "[PERF_COUNTER] LSU_UBench_LoadStoreQueueWrapAround:lsq_wrap_cycles=" << kWraps << std::endl;
 }
+

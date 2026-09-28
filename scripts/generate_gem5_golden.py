@@ -12,8 +12,8 @@ import shutil
 
 def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    gem5_bin = "/Users/kuanwei/workspace/gem5/build/ARM/gem5.opt"
-    gem5_config = "/Users/kuanwei/workspace/gem5/configs/example/arm/starter_se.py"
+    gem5_bin = os.environ.get("GEM5_BIN", "/home/kw/workspace/gem5/build/ARM/gem5.opt")
+    gem5_config = os.environ.get("GEM5_CONFIG", "/home/kw/workspace/gem5/configs/example/arm/starter_se.py")
     fixtures_dir = os.path.join(root_dir, "tests", "fixtures")
     golden_dir = os.path.join(root_dir, "tests", "golden", "gem5")
     

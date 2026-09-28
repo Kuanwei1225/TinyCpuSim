@@ -25,7 +25,7 @@ import subprocess
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
 GOLDEN_DB_PATH = os.path.join(PROJECT_ROOT, "tests", "uarch", "golden_counters.json")
-DEFAULT_GEM5_BIN = "/Users/kuanwei/workspace/gem5/build/ARM/gem5.opt"
+DEFAULT_GEM5_BIN = os.environ.get("GEM5_BIN", "/home/kw/workspace/gem5/build/ARM/gem5.opt")
 
 SUITE_ALIASES = {
     "bpu": "bp",
