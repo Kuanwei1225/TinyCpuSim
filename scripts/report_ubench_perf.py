@@ -84,7 +84,7 @@ def run_suite_and_parse_counters(binary_name, filter_pattern=""):
 
     return counters
 
-def evaluate_suite(suite_key, suite_data, filter_pattern="", custom_tolerance=None):
+def evaluate_suite(suite_key, suite_data, filter_pattern="", custom_tolerance=None, measured_counters=None):
     title = suite_data.get('title', suite_key)
     binary = suite_data.get('binary')
     calibrated = suite_data.get('calibrated', True)
@@ -100,8 +100,9 @@ def evaluate_suite(suite_key, suite_data, filter_pattern="", custom_tolerance=No
         print(f"{Colors.YELLOW}{' [PENDING CALIBRATION] Subsystem not yet fully calibrated against gem5':<104}{Colors.RESET}")
         return True, []
 
-    # Run the isolated C++ microbenchmark binary
-    measured_counters = run_suite_and_parse_counters(binary, filter_pattern)
+    # Run the isolated C++ microbenchmark binary if not pre-measured
+    if measured_counters is None:
+        measured_counters = run_suite_and_parse_counters(binary, filter_pattern)
 
     all_passed = True
     rows = []
@@ -188,6 +189,13 @@ def main():
         default=None,
         help="Override invariant tolerance percentage threshold (default: per-benchmark invariant, typically 1.0%%)"
     )
+    default_jobs = max(1, (os.cpu_count() or 4) // 2)
+    parser.add_argument(
+        "-j", "--jobs",
+        type=int,
+        default=default_jobs,
+        help=f"Parallel worker threads/processes for multi-suite batches (default: {default_jobs}, half of CPU cores)"
+    )
     parser.add_argument(
         "--export-md",
         type=str,
@@ -226,12 +234,29 @@ def main():
             sys.exit(1)
         suites_to_run = [selected_suite]
 
+    import concurrent.futures
+
+    def _fetch_suite_counters(s_key):
+        s_data = golden_db["suites"][s_key]
+        binary = s_data.get('binary')
+        calibrated = s_data.get('calibrated', True)
+        if not calibrated:
+            return s_key, {}
+        return s_key, run_suite_and_parse_counters(binary, args.filter)
+
+    pre_measured = {}
+    if args.jobs > 1 and len(suites_to_run) > 1:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+            suite_counter_list = list(executor.map(_fetch_suite_counters, suites_to_run))
+            pre_measured = dict(suite_counter_list)
+
     overall_success = True
     all_reports = {}
 
     for s_key in suites_to_run:
         s_data = golden_db["suites"][s_key]
-        passed, rows = evaluate_suite(s_key, s_data, args.filter, args.tolerance)
+        measured = pre_measured.get(s_key, None)
+        passed, rows = evaluate_suite(s_key, s_data, args.filter, args.tolerance, measured_counters=measured)
         all_reports[s_key] = (s_data, rows)
         if not passed:
             overall_success = False

@@ -12,8 +12,8 @@ _start:
     /* Set up scratch buffer address */
     ldr r4, =scratch_buf
 
-    /* Initialize loop counter: 3 iterations */
-    movs r7, #3
+    /* Initialize loop counter: 35 iterations */
+    movs r7, #35
 
 coverage_loop:
     /* 1. MOV, MVN, MOVW, MOVT */

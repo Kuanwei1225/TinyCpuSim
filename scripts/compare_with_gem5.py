@@ -91,6 +91,20 @@ def print_table(case_name, ts, g5):
     print("=" * 70)
     print()
 
+import argparse
+import concurrent.futures
+
+def _run_single_case(args_tuple):
+    g_file, fixtures_dir, sim_bin = args_tuple
+    case_name = os.path.basename(g_file).replace('.stats.txt', '')
+    elf_file = os.path.join(fixtures_dir, f"{case_name}.elf")
+    if not os.path.exists(elf_file):
+        return case_name, None, None, f"Warning: ELF fixture not found for {case_name}"
+    res = subprocess.run([sim_bin, "--uarch", elf_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    ts = parse_tinysim_stats(res.stdout)
+    g5 = parse_gem5_stats(g_file)
+    return case_name, ts, g5, None
+
 def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     golden_dir = os.path.join(root_dir, "tests", "golden", "gem5")
@@ -99,7 +113,15 @@ def main():
     if not os.path.exists(sim_bin):
         sim_bin = os.path.join(root_dir, "build", "tinyarmsim")
 
-    if len(sys.argv) == 1 or sys.argv[1] in ['--all', '-a']:
+    default_jobs = max(1, (os.cpu_count() or 4) // 2)
+    parser = argparse.ArgumentParser(description="TinyArmSim vs gem5 Golden Reference Accuracy Comparator")
+    parser.add_argument("files", nargs="*", help="Optional <tinysim_stats.txt> <gem5_stats.txt> files")
+    parser.add_argument("--all", "-a", action="store_true", help="Run batch comparison against all golden references")
+    parser.add_argument("--case", help="Run comparison for a specific test case name")
+    parser.add_argument("-j", "--jobs", type=int, default=default_jobs, help=f"Parallel worker threads/processes (default: {default_jobs}, half of CPU cores)")
+    args = parser.parse_args()
+
+    if args.all or (not args.case and not args.files):
         # Batch regression mode against all golden files
         golden_files = sorted(glob.glob(os.path.join(golden_dir, "*.stats.txt")))
         if not golden_files:
@@ -107,23 +129,21 @@ def main():
             sys.exit(1)
             
         print(f"Running automated regression comparison for {len(golden_files)} benchmarks...")
-        print(f"Golden Directory: {golden_dir}\n")
+        print(f"Golden Directory: {golden_dir}")
+        print(f"Parallel Workers: {args.jobs} (half of CPU cores)\n")
         
-        for g_file in golden_files:
-            case_name = os.path.basename(g_file).replace('.stats.txt', '')
-            elf_file = os.path.join(fixtures_dir, f"{case_name}.elf")
-            if not os.path.exists(elf_file):
-                print(f"Warning: ELF fixture not found for {case_name}")
+        task_args = [(g_file, fixtures_dir, sim_bin) for g_file in golden_files]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+            results = list(executor.map(_run_single_case, task_args))
+
+        for case_name, ts, g5, warn in results:
+            if warn:
+                print(warn)
                 continue
-                
-            # Run TinyArmSim
-            res = subprocess.run([sim_bin, "--uarch", elf_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            ts = parse_tinysim_stats(res.stdout)
-            g5 = parse_gem5_stats(g_file)
             print_table(case_name, ts, g5)
 
-    elif len(sys.argv) == 2 and sys.argv[1].startswith('--case='):
-        case_name = sys.argv[1].split('=', 1)[1]
+    elif args.case:
+        case_name = args.case
         g_file = os.path.join(golden_dir, f"{case_name}.stats.txt")
         elf_file = os.path.join(fixtures_dir, f"{case_name}.elf")
         res = subprocess.run([sim_bin, "--uarch", elf_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -131,15 +151,12 @@ def main():
         g5 = parse_gem5_stats(g_file)
         print_table(case_name, ts, g5)
 
-    elif len(sys.argv) >= 3:
-        ts = parse_tinysim_stats(sys.argv[1])
-        g5 = parse_gem5_stats(sys.argv[2])
-        print_table(os.path.basename(sys.argv[1]), ts, g5)
+    elif len(args.files) >= 2:
+        ts = parse_tinysim_stats(args.files[0])
+        g5 = parse_gem5_stats(args.files[1])
+        print_table(os.path.basename(args.files[0]), ts, g5)
     else:
-        print("Usage:")
-        print("  compare_with_gem5.py --all")
-        print("  compare_with_gem5.py --case=<test_name>")
-        print("  compare_with_gem5.py <tinysim_stats.txt> <gem5_stats.txt>")
+        parser.print_help()
 
 if __name__ == '__main__':
     main()

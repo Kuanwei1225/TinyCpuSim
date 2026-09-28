@@ -111,6 +111,14 @@
           "gem5_counter": "branchPred.squashes::total / branchSquash",
           "gem5_val": 14,
           "tolerance_pct": 0.0
+        },
+        {
+          "ubench": "BPU_UBench_MultiPhasePeriodicAndCorrelatedBranches",
+          "metric": "Multi-Phase Periodic & Correlated Steady Branch Hits",
+          "counter_key": "steady_correct",
+          "gem5_counter": "branchPred.condCorrect (Multi-Phase)",
+          "gem5_val": 1045,
+          "tolerance_pct": 1.0
         }
       ]
     },

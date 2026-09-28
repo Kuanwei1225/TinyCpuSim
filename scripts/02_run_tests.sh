@@ -13,11 +13,15 @@ fi
 
 cd "${BUILD_DIR}"
 
+NUM_CORES=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+HALF_CORES=$(( (${NUM_CORES} + 1) / 2 ))
+JOBS=${JOBS:-${HALF_CORES}}
+
 echo "============================================================"
-echo " [Step 2/5] Running Full Regression Suite (156+ Tests)      "
+echo " [Step 2/5] Running Full Regression Suite (Parallel: ${JOBS} workers)"
 echo "============================================================"
 
-ctest --output-on-failure
+ctest -j"${JOBS}" --output-on-failure "$@"
 
 echo ""
 echo "============================================================"

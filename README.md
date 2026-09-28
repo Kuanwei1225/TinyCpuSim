@@ -1,6 +1,6 @@
 # TinyCpuSim
 
-[![Build & Test](https://img.shields.io/badge/tests-156%2F156%20passed-brightgreen.svg)]()
+[![Build & Test](https://img.shields.io/badge/tests-168%2F168%20passed-brightgreen.svg)]()
 [![Standard](https://img.shields.io/badge/C%2B%2B-17-blue.svg)]()
 [![ISA](https://img.shields.io/badge/ISA-ARMv7--M%20%2F%20Thumb--2-orange.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
@@ -99,12 +99,12 @@ Launch the interactive text user interface:
 Please choose a step or action:
   [C] Config:   Configure Active Simulation, Hardware Knobs, Presets, Save/Load
   [1] Step 1:   Build Project (Release Mode)
-  [2] Step 2:   Run Full Test Suite (156+ Unit & Regression Tests)
+  [2] Step 2:   Run Full Test Suite (168 Unit & Regression Tests)
   [3] Step 3:   Run Component Microbenchmarks (uBench)
   [4] Step 4:   Run CPU Simulation (reads configs/current.cfg automatically)
   [5] Step 5:   Compare Accuracy against gem5 Golden Reference
   [6] Exp:      Run Experiment on Active Config vs Baseline
-  [7] Sweep:    Run Batch Parameter Sweep on configs/sweep/
+  [7] Sweep:    Run Dynamic Parameter Sweep on Microarchitecture Knobs
   [H] Help:     View Complete Command & Usage Manual
   [0] Exit
 ============================================================
@@ -115,22 +115,22 @@ Please choose a step or action:
 ```bash
 # Workflow Steps
 ./run.sh build                      # [Step 1] Build simulator (Release mode)
-./run.sh test                       # [Step 2] Run 156+ unit & regression tests
+./run.sh test                       # [Step 2] Run 168 unit & regression tests (parallel ctest)
 ./run.sh ubench [bpu|exec|rob|cache|all] # [Step 3] Run component microbenchmarks
 ./run.sh sim [elf] [config]         # [Step 4] Run simulation (zero-args reads current.cfg)
-./run.sh gem5 [--all]               # [Step 5] Compare accuracy vs gem5 golden
+./run.sh gem5 [--all]               # [Step 5] Compare accuracy vs gem5 golden (parallel)
 
 # Configuration & Editing
 ./run.sh edit                       # Direct vi editing of active configs/current.cfg
 ./run.sh show                       # Display full active microarchitecture dashboard
-./run.sh list                       # List all presets and snapshots in default/, save/, sweep/
+./run.sh list                       # List all presets and snapshots in default/ and save/
 ./run.sh config                     # Launch interactive configuration manager TUI
 
-# Microarchitectural Experiments
+# Microarchitectural Experiments & Sweeps
 ./run.sh exp                        # Run experiment on active config (current.cfg) vs baseline
 ./run.sh exp [elf]                  # Run experiment on target ELF using active config
 ./run.sh exp --set k=v              # Run experiment with hardware overrides (e.g. ooo=false)
-./run.sh sweep                      # Run batch parameter sweep on configs/sweep/
+./run.sh sweep                      # Run dynamic parameter sweep across microarchitectural knobs
 
 # Catalogs & Utilities
 ./run.sh knobs                      # List all tunable hardware parameters & units
@@ -141,21 +141,21 @@ Please choose a step or action:
 
 ---
 
-## Configuration Lifecycle Management (`config.py`)
+### Configuration Lifecycle Management (`config.py`)
 
-Configuration management is organized into a clean 3-repository model under `configs/`:
+Configuration management is organized into a clean repository model under `configs/`:
 
 ```text
 configs/
-├── current.cfg         # Active simulation configuration (linked/copied from default/)
-├── default/            # Standard modular presets
+├── current.cfg             # Active simulation configuration (linked/copied from default/)
+├── all_params_template.cfg # Comprehensive template documenting all knobs
+├── default/                # Canonical baseline presets
 │   ├── default.cfg             # 4-wide OoO (Tomasulo), TAGE BPU, 32KB L1I/D, 512KB L2
 │   ├── multicore_4core.cfg     # 4 Cores OoO, MESI Cache Coherence, 2MB Shared L2
 │   ├── mem_fast_feeder.cfg     # FAST_FEEDER core + IDEAL BPU + full cache hierarchy (50x fast mem eval)
 │   ├── bpu_standalone.cfg      # FAST_FEEDER core + TAGE BPU + ZERO_LATENCY caches (isolated BPU eval)
 │   └── inorder_embedded.cfg    # SIMPLE_INORDER 1-wide core + BIMODAL + un-cached passthrough
-├── save/               # User custom snapshots (e.g. my_opt_v1.cfg)
-└── sweep/              # Batch parameter sweep configurations
+└── save/                   # User custom snapshots (e.g. my_opt_v1.cfg)
 ```
 
 ### Polymorphic Subsystem Selection
@@ -277,7 +277,7 @@ Automatically detects system CPU cores, configures CMake in Release mode, and bu
 ```bash
 ./scripts/02_run_tests.sh
 ```
-Runs all 156 unit and regression tests with a 100% pass guarantee.
+Runs all 168 unit and regression tests in parallel (`ctest -j`) with a 100% pass guarantee.
 
 ---
 
@@ -295,6 +295,7 @@ Runs all 156 unit and regression tests with a 100% pass guarantee.
 ```
 
 #### Key Capabilities:
+- **Parallel Execution**: Multi-process worker pool (auto-configured to half available CPU cores or `-j/--jobs`) speeds up batch runs.
 - **Baseline Tracking (`reports/ubench/default/`)**: Automatically compares active runs against baseline statistics with cycle deltas.
 - **Top Performers vs Bottlenecks**: Automatically ranks and isolates optimal subsystem efficiencies vs critical performance bottlenecks.
 - **Detailed Report Output (`reports/ubench/`)**: Saves full microarchitectural logs for every run into `reports/ubench/`.
@@ -390,9 +391,9 @@ TinySim/
 ├── run.sh                    # Unified launcher & workflow manager
 ├── configs/                  # Microarchitecture configurations
 │   ├── current.cfg           # Active simulation configuration
-│   ├── default/              # Baseline templates (default.cfg, multicore.cfg)
-│   ├── save/                 # Custom saved snapshot configs
-│   └── sweep/                # Parameter sweep configs
+│   ├── all_params_template.cfg # Template of all configuration knobs
+│   ├── default/              # Baseline presets (default.cfg, multicore_4core.cfg, etc.)
+│   └── save/                 # Custom saved snapshot configs
 ├── include/tinyarmsim/       # Public C++ headers
 │   ├── isa/                  # ISA decoder, instruction definitions, register state
 │   ├── memory/               # Memory bus, non-blocking caches, MESI coherence
@@ -402,21 +403,25 @@ TinySim/
 │   ├── isa/                  # ISA simulation & disassembler
 │   ├── memory/               # Memory bus & cache controller
 │   └── uarch/                # Cycle-accurate OoO pipeline stages
-├── scripts/                  # Workflow scripts & Python tools
+├── scripts/                  # Workflow scripts & multi-process Python tools
 │   ├── 01_build.sh           # Step 1: 1-click build script
-│   ├── 02_run_tests.sh       # Step 2: Full test suite runner (156 tests)
+│   ├── 02_run_tests.sh       # Step 2: Full test suite runner (168 tests, parallel ctest)
 │   ├── 03_run_ubench.sh      # Step 3: Component microbenchmark runner
 │   ├── 04_run_simulation.sh  # Step 4: Full-system simulation runner
 │   ├── 05_compare_gem5.sh    # Step 5: gem5 golden comparison tool
 │   ├── config.py             # Configuration lifecycle manager & TUI
 │   ├── experiment.py         # Microarchitectural experiment engine & comparison
-│   └── compare_with_gem5.py  # gem5 accuracy comparator
+│   ├── sweep_parameters.py   # Multi-process parameter sweep engine
+│   ├── run_ubench.py         # Multi-process uBench suite runner
+│   ├── report_ubench_perf.py # uBench baseline & performance validator
+│   └── compare_with_gem5.py  # Multi-process gem5 accuracy comparator
 ├── reports/                  # Generated experiment & simulation reports
-│   └── default/              # Cached default baseline reports for test ELFs
+│   ├── default/              # Cached default baseline reports for test ELFs
+│   └── ubench/               # Component microbenchmark baseline & run reports
 └── tests/                    # Tests and benchmarks
     ├── fixtures/             # Bare-metal ELF binaries & assembly sources
     ├── golden/gem5/          # gem5 reference statistics logs
-    └── unit & ubench tests   # 156 CTest GoogleTest cases
+    └── unit & ubench tests   # 168 CTest GoogleTest cases
 ```
 
 ---

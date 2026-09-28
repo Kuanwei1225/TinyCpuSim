@@ -665,6 +665,7 @@ def main():
     parser.add_argument("--base-report", "-br", help="Optional baseline report text file to compare against")
     parser.add_argument("--list-params", "-lp", action="store_true", help="List all tunable microarchitecture parameters with descriptions")
     parser.add_argument("--list-elfs", "-le", action="store_true", help="List all available built-in test benchmark ELF files")
+    parser.add_argument("--jobs", "-j", type=int, default=max(1, (os.cpu_count() or 4) // 2), help=f"Parallel worker threads/processes for multi-ELF batches (default: {max(1, (os.cpu_count() or 4) // 2)}, half of CPU cores)")
     parser.add_argument("--output", "-o", help="Optional report file path to save output")
     args = parser.parse_args()
 
@@ -791,40 +792,64 @@ def main():
         exp_cfg = exp_source_cfg
         changed_params = diff_configs(base_cfg, exp_cfg)
 
+    import concurrent.futures
+
+    def _sim_worker(target_path):
+        elf_base = os.path.basename(target_path).replace('.elf', '')
+        default_base_report = os.path.join(default_reports_dir, f"{elf_base}.txt")
+
+        has_baseline = False
+        baseline_report_path = None
+        if args.base_report and os.path.exists(args.base_report):
+            has_baseline = True
+            baseline_report_path = args.base_report
+        elif os.path.exists(default_base_report):
+            has_baseline = True
+            baseline_report_path = default_base_report
+
+        exp_stats, exp_log = run_sim(sim_bin, target_path, exp_cfg)
+
+        out_file = args.output
+        if not out_file:
+            import datetime
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_file = os.path.join(reports_dir, f"exp_{elf_base}_{ts}.txt")
+
+        with open(out_file, 'w') as f_out:
+            f_out.write(format_report_header(target_path, exp_cfg, changed_params))
+            f_out.write(exp_log)
+
+        base_stats = None
+        if has_baseline:
+            with open(baseline_report_path, 'r') as f_br:
+                base_stats = parse_perf_output(f_br.read())
+
+        return {
+            'elf_path': target_path,
+            'elf_base': elf_base,
+            'has_baseline': has_baseline,
+            'baseline_report_path': baseline_report_path,
+            'exp_stats': exp_stats,
+            'base_stats': base_stats,
+            'out_file': out_file
+        }
+
     try:
-        for elf_path in elf_targets:
-            elf_base = os.path.basename(elf_path).replace('.elf', '')
-            default_base_report = os.path.join(default_reports_dir, f"{elf_base}.txt")
+        if len(elf_targets) > 1:
+            print(f"Running {len(elf_targets)} simulations in parallel using {args.jobs} workers (half of CPU cores)...")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                results = list(executor.map(_sim_worker, elf_targets))
+        else:
+            results = [_sim_worker(elf_targets[0])]
 
-            # Check if baseline report exists
-            has_baseline = False
-            baseline_report_path = None
-            if args.base_report and os.path.exists(args.base_report):
-                has_baseline = True
-                baseline_report_path = args.base_report
-            elif os.path.exists(default_base_report):
-                has_baseline = True
-                baseline_report_path = default_base_report
+        for r in results:
+            elf_path = r['elf_path']
+            elf_base = r['elf_base']
+            exp_stats = r['exp_stats']
+            out_file = r['out_file']
 
-            # 1. Run Experiment Simulation
-            print(f"Simulating target program: {os.path.basename(elf_path)} on {os.path.basename(exp_cfg)}...")
-            exp_stats, exp_log = run_sim(sim_bin, elf_path, exp_cfg)
-
-            out_file = args.output
-            if not out_file:
-                import datetime
-                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                out_file = os.path.join(reports_dir, f"exp_{elf_base}_{ts}.txt")
-
-            with open(out_file, 'w') as f_out:
-                f_out.write(format_report_header(elf_path, exp_cfg, changed_params))
-                f_out.write(exp_log)
-
-            # 2. Display Results
-            if has_baseline:
-                with open(baseline_report_path, 'r') as f_br:
-                    base_stats = parse_perf_output(f_br.read())
-                print_comparison_table(elf_path, changed_params, base_stats, exp_stats, baseline_report_path, exp_cfg)
+            if r['has_baseline']:
+                print_comparison_table(elf_path, changed_params, r['base_stats'], exp_stats, r['baseline_report_path'], exp_cfg)
                 print(f"  Experiment performance report saved to: \033[1;36m{out_file}\033[0m")
             else:
                 print_single_run_table(elf_path, exp_stats, changed_params, exp_cfg)

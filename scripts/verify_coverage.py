@@ -82,9 +82,17 @@ def run_test(sim_path, elf_path):
         "opcode_counts": opcode_counts
     }
 
+import argparse
+import concurrent.futures
+
 def main():
     repo_root = Path(__file__).resolve().parent.parent
     os.chdir(repo_root)
+    default_jobs = max(1, (os.cpu_count() or 4) // 2)
+
+    parser = argparse.ArgumentParser(description="TinyArmSim Automated Test & ISA Coverage Verification Tool")
+    parser.add_argument("-j", "--jobs", type=int, default=default_jobs, help=f"Parallel worker threads/processes (default: {default_jobs}, half of CPU cores)")
+    args = parser.parse_args()
 
     sim_path = find_simulator()
     if not sim_path:
@@ -99,16 +107,17 @@ def main():
     print("=" * 70)
     print("           TinyArmSim Test Suite & ISA Coverage Report           ")
     print("=" * 70)
-    print(f"Simulator: {sim_path}")
-    print(f"Fixtures : {len(elf_files)} patterns found\n")
+    print(f"Simulator:        {sim_path}")
+    print(f"Fixtures :        {len(elf_files)} patterns found")
+    print(f"Parallel Workers: {args.jobs} (half of CPU cores)\n")
 
     total_opcode_counts = {op: 0 for op in ALL_OPCODES}
     all_tests_passed = True
-    test_results = []
 
-    for elf in elf_files:
-        res = run_test(sim_path, elf)
-        test_results.append(res)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+        test_results = list(executor.map(lambda elf: run_test(sim_path, elf), elf_files))
+
+    for res in test_results:
         status_str = "PASSED" if res["passed"] else "FAILED"
         print(f"  [RUN] {res['elf']:<30} -> {status_str} (exit code {res['returncode']})")
         if not res["passed"]:

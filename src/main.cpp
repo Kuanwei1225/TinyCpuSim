@@ -33,7 +33,7 @@ void print_usage(const char* prog_name) {
               << "Examples:\n"
               << "  " << prog_name << " app.elf\n"
               << "  " << prog_name << " --log --coverage cov.csv app.elf\n"
-              << "  " << prog_name << " --uarch --uarch-config configs/ooo_medium.cfg app.elf\n"
+              << "  " << prog_name << " --uarch --uarch-config configs/default/default.cfg app.elf\n"
               << "  " << prog_name << " --uarch --uarch-stats stats.txt app.elf\n"
               << "  " << prog_name << " --uarch --topdown report.json --topdown-format json app.elf\n"
               << std::endl;

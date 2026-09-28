@@ -147,17 +147,46 @@ def calculate_correlation(x_vals, y_vals):
     if std_x == 0 or std_y == 0: return 1.0
     return cov / (std_x * std_y)
 
+import argparse
+import concurrent.futures
+
+def _eval_single_workload(args_tuple):
+    elf_name, cfg_path = args_tuple
+    elf_path = os.path.join(FIXTURES_DIR, elf_name)
+    stats_name = elf_name.replace(".elf", ".stats.txt")
+    golden_path = os.path.join(GOLDEN_DIR, stats_name)
+
+    if not os.path.exists(elf_path):
+        return elf_name, None, None, f"Warning: ELF fixture {elf_path} not found."
+    if not os.path.exists(golden_path):
+        return elf_name, None, None, f"Warning: gem5 golden file {golden_path} not found."
+
+    gem5_stats = parse_gem5_stats(golden_path)
+    tiny_stats, raw_log = run_tinysim(elf_path, cfg_path)
+    return elf_name, gem5_stats, tiny_stats, None
+
 def main():
+    default_jobs = max(1, (os.cpu_count() or 4) // 2)
+    parser = argparse.ArgumentParser(description="TinyCpuSim vs gem5 Golden Architectural Verification & Correlation")
+    parser.add_argument("-j", "--jobs", type=int, default=default_jobs, help=f"Parallel worker threads/processes (default: {default_jobs}, half of CPU cores)")
+    parser.add_argument("-c", "--config", default=DEFAULT_CFG, help=f"TinySim config file (default: {DEFAULT_CFG})")
+    args = parser.parse_args()
+
     if not os.path.exists(SIM_BIN):
         print("Building simulator binary...")
-        subprocess.run(["cmake", "--build", BUILD_DIR, "-j4"], check=True)
+        subprocess.run(["cmake", "--build", BUILD_DIR, "-j", str(args.jobs)], check=True)
 
     print("=" * 96)
     print("           TinyCpuSim vs gem5 Golden Architectural Verification & Correlation           ")
     print("=" * 96)
     print(f"  Golden Baselines Directory: {GOLDEN_DIR}")
-    print(f"  Active Configuration:       {DEFAULT_CFG}")
+    print(f"  Active Configuration:       {args.config}")
+    print(f"  Parallel Workers:           {args.jobs} (half of CPU cores)")
     print("-" * 96)
+
+    workload_args = [(elf_name, args.config) for elf_name in WORKLOADS]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+        eval_results = list(executor.map(_eval_single_workload, workload_args))
 
     table_rows = []
     gem5_insts_list = []
@@ -167,24 +196,14 @@ def main():
     gem5_ipc_list = []
     tiny_ipc_list = []
 
-    for elf_name in WORKLOADS:
-        elf_path = os.path.join(FIXTURES_DIR, elf_name)
-        stats_name = elf_name.replace(".elf", ".stats.txt")
-        golden_path = os.path.join(GOLDEN_DIR, stats_name)
-
-        if not os.path.exists(elf_path):
-            print(f"Warning: ELF fixture {elf_path} not found.")
+    for elf_name, gem5_stats, tiny_stats, warn_msg in eval_results:
+        if warn_msg:
+            print(warn_msg)
             continue
-        if not os.path.exists(golden_path):
-            print(f"Warning: gem5 golden file {golden_path} not found.")
-            continue
-
-        gem5_stats = parse_gem5_stats(golden_path)
-        tiny_stats, raw_log = run_tinysim(elf_path, DEFAULT_CFG)
 
         g_insts = gem5_stats.get('insts', 0)
         t_insts = tiny_stats.get('insts', 0)
-        inst_match = (g_insts == t_insts) or (abs(g_insts - t_insts) <= 2) # small variation due to exit syscall / SVC wrapper
+        inst_match = (g_insts == t_insts) or (abs(g_insts - t_insts) <= 2)
 
         g_cycles = gem5_stats.get('cycles', 0)
         t_cycles = tiny_stats.get('cycles', 0)

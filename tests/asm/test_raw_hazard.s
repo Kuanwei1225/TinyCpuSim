@@ -5,9 +5,9 @@
 .type _start, %function
 
 _start:
-    /* Back-to-back RAW data hazard chain */
+    /* Back-to-back RAW data hazard chain (>3000 instructions) */
     movs r0, #0
-    movs r1, #100      /* Loop 100 times */
+    movw r1, #500      /* Loop 500 times */
 
 raw_loop:
     adds r0, r0, #1    /* r0 dependency chain */
@@ -17,8 +17,8 @@ raw_loop:
     subs r1, r1, #1
     bne raw_loop
 
-    /* Expected r0: 100 * (1+2+3+4) = 1000 */
-    movw r2, #1000
+    /* Expected r0: 500 * (1+2+3+4) = 5000 */
+    movw r2, #5000
     cmp r0, r2
     bne fail
 

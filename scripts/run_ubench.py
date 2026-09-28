@@ -355,7 +355,8 @@ def main():
     )
     parser.add_argument("suite", nargs="?", help="Target suite: [all|bpu|exec|rob|cache]")
     parser.add_argument("--config", "-c", help="Configuration file to test (defaults to configs/current.cfg)")
-    parser.add_argument("--output", "-o", help="Optional report file path to save output")
+    default_jobs = max(1, (os.cpu_count() or 4) // 2)
+    parser.add_argument("-j", "--jobs", type=int, default=default_jobs, help=f"Parallel worker threads/processes (default: {default_jobs}, half of CPU cores)")
     args = parser.parse_args()
 
     os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -388,6 +389,7 @@ def main():
     print("         TinyCpuSim Microbenchmark Performance & Configuration Sensitivity Suite        ")
     print("=" * 88)
     print(f"  Applied Active Config:   {active_cfg}")
+    print(f"  Parallel Workers:        {args.jobs} (half of CPU cores)")
     if changed_knobs:
         print("  Active Hardware Parameter Modifications (vs Baseline):")
         for sec, k, v_b, v_a in changed_knobs:
@@ -398,14 +400,20 @@ def main():
         print("  Active Hardware Parameters: (Matches Baseline Default Configuration)")
     print("-" * 88)
 
-    all_results = []
+    import concurrent.futures
+
+    # Run each requested suite (in parallel if multiple)
+    if args.jobs > 1 and len(suites_to_run) > 1:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+            all_results = list(executor.map(lambda s_key: run_single_suite(s_key, sim_bin, active_cfg), suites_to_run))
+    else:
+        all_results = [run_single_suite(s_key, sim_bin, active_cfg) for s_key in suites_to_run]
+
     generated_reports = []
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Run each requested suite
-    for s_key in suites_to_run:
-        suite_res = run_single_suite(s_key, sim_bin, active_cfg)
-        all_results.append(suite_res)
+    for suite_res in all_results:
+        s_key = suite_res["suite_key"]
 
         base_file = os.path.join(DEFAULT_REPORTS_DIR, f"{s_key}.txt")
         baseline_data = parse_baseline_file(base_file)

@@ -99,11 +99,28 @@ def run_simulation(sim_bin, elf_path, cfg_path):
     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return parse_stats(res.stdout)
 
+import concurrent.futures
+
+def _run_sweep_item(args_tuple):
+    label, overrides, base_cfg, sim_bin, elf_file = args_tuple
+    tmp_cfg = generate_temp_config(base_cfg, overrides)
+    try:
+        stats = run_simulation(sim_bin, elf_file, tmp_cfg)
+        return label, stats
+    finally:
+        if os.path.exists(tmp_cfg):
+            try:
+                os.remove(tmp_cfg)
+            except OSError:
+                pass
+
 def main():
+    default_jobs = max(1, (os.cpu_count() or 4) // 2)
     parser = argparse.ArgumentParser(description="TinyCpuSim Parameter Sweep Utility")
     parser.add_argument("--elf", default="tests/fixtures/test_fibonacci.elf", help="Target ELF binary")
     parser.add_argument("--param", choices=["rob_size", "issue_width", "l1d_size", "bp_type"], default="rob_size", help="Parameter to sweep")
-    parser.add_argument("--base-cfg", default="configs/ooo_medium.cfg", help="Base config file")
+    parser.add_argument("--base-cfg", default="configs/default/default.cfg", help="Base config file")
+    parser.add_argument("-j", "--jobs", type=int, default=default_jobs, help=f"Parallel worker threads/processes (default: {default_jobs}, half of CPU cores)")
     args = parser.parse_args()
 
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -140,23 +157,22 @@ def main():
 
     print("=" * 75)
     print(f"  TinyCpuSim Parameter Sweep: [{args.param}] on {os.path.basename(elf_file)}")
-    print(f"  Base Config: {os.path.basename(base_cfg)}")
+    print(f"  Base Config:      {os.path.basename(base_cfg)}")
+    print(f"  Parallel Workers: {args.jobs} (half of CPU cores)")
     print("=" * 75)
     print(f"{'Configuration':<18} | {'Cycles':<10} | {'IPC':<8} | {'Branch Acc':<12} | {'L1D Hit Rate':<12}")
     print("-" * 75)
 
-    for label, overrides in sweep_configs:
-        tmp_cfg = generate_temp_config(base_cfg, overrides)
-        try:
-            stats = run_simulation(sim_bin, elf_file, tmp_cfg)
-            cycles = stats.get('cycles', 'N/A')
-            ipc = f"{stats.get('ipc', 0.0):.3f}" if 'ipc' in stats else 'N/A'
-            b_acc = f"{stats.get('branch_acc', 0.0):.1f}%" if 'branch_acc' in stats else 'N/A'
-            l1d = f"{stats.get('l1d_hit_rate', 0.0):.1f}%" if 'l1d_hit_rate' in stats else 'N/A'
-            print(f"{label:<18} | {str(cycles):<10} | {ipc:<8} | {b_acc:<12} | {l1d:<12}")
-        finally:
-            if os.path.exists(tmp_cfg):
-                os.remove(tmp_cfg)
+    task_args = [(label, overrides, base_cfg, sim_bin, elf_file) for label, overrides in sweep_configs]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+        results = list(executor.map(_run_sweep_item, task_args))
+
+    for label, stats in results:
+        cycles = stats.get('cycles', 'N/A')
+        ipc = f"{stats.get('ipc', 0.0):.3f}" if 'ipc' in stats else 'N/A'
+        b_acc = f"{stats.get('branch_acc', 0.0):.1f}%" if 'branch_acc' in stats else 'N/A'
+        l1d = f"{stats.get('l1d_hit_rate', 0.0):.1f}%" if 'l1d_hit_rate' in stats else 'N/A'
+        print(f"{label:<18} | {str(cycles):<10} | {ipc:<8} | {b_acc:<12} | {l1d:<12}")
 
     print("=" * 75)
 

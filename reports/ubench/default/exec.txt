@@ -2,33 +2,33 @@
              TinyCpuSim Microbenchmark Performance & Diagnostic Report          
 ================================================================================
   Suite Component:       Execution Engine & LSU (exec)
-  Generation Timestamp:  2026-09-27 00:20:58
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Generation Timestamp:  2026-09-28 21:53:10
+  Applied Configuration: /home/kw/workspace/TinyCpuSim/configs/current.cfg
   Representative ELF:    test_store_forward.elf
-  Test Pass Count:       12 / 12
+  Test Pass Count:       15 / 12
 --------------------------------------------------------------------------------
   Top Microarchitecture Hardware Metrics:
-    • cycles: 19
-    • ipc: 1.0
-    • insts: 19
-    • uops: 22
-    • branch_acc: 100.0
-    • branch_mispredicts: 0
-    • btb_hit_rate: 0.0
+    • cycles: 2210
+    • ipc: 2.269
+    • insts: 5015
+    • uops: 6271
+    • branch_acc: 99.2
+    • branch_mispredicts: 2
+    • btb_hit_rate: 98.82
     • ras_hit_rate: 0.0
-    • l1i_hit_rate: 94.74
-    • l1d_hit_rate: 75.0
-    • l2_hit_rate: 0.0
-    • store_forwards: 3
-    • forwarding_rate: 75.0
-    • rs_stalls: 0
-    • rob_stalls: 0
+    • l1i_hit_rate: 99.87
+    • l1d_hit_rate: 99.84
+    • l2_hit_rate: 25.0
+    • store_forwards: 1248
+    • forwarding_rate: 99.76
+    • rs_stalls: 87
+    • rob_stalls: 1954
     • prf_stalls: 0
     • head_rob_stalls: 0
-    • retiring: 100.0
+    • retiring: 75.45
     • bad_spec: 0.0
     • frontend_bound: 0.0
-    • backend_bound: 0.0
+    • backend_bound: 24.55
     • l1d_mshr_stalls: 0
 --------------------------------------------------------------------------------
   Detailed Microbenchmark Test Cases:
@@ -47,18 +47,18 @@
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
-Loading ELF: /Users/kuanwei/workspace/TinySim/tests/fixtures/test_store_forward.elf...
+Loading ELF: /home/kw/workspace/TinyCpuSim/tests/fixtures/test_store_forward.elf...
 Microarchitecture Simulation Mode ENABLED
-  Cores: 1 | OoO: Yes | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
+  Cores: 1 | Core: OoO (Tomasulo) | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
 Entry Point: 0x10000
 Starting simulation...
 
 ============================================================
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
-Total Instructions: 19
-Elapsed Time:       0.000048 s
-Simulation Speed:   394805.19 inst/s (0.39 MIPS)
+Total Instructions: 5015
+Elapsed Time:       0.001842 s
+Simulation Speed:   2722235.37 inst/s (2.72 MIPS)
 ============================================================
 
 
@@ -66,70 +66,72 @@ Simulation Speed:   394805.19 inst/s (0.39 MIPS)
                TinyCpuSim uArch Simulation Report           
 ============================================================
 Simulated Target Clock:    1000.00 MHz
-Simulated Target Time:     1.9000e-08 s
-Simulated Total Cycles:    19 ticks
-Total Committed Insts:     19
-Total Committed uOps:      22
-Aggregate Throughput (IPC):1.000 inst/cycle (uOp IPC: 1.158)
+Simulated Target Time:     2.2100e-06 s
+Simulated Total Cycles:    2210 ticks
+Total Committed Insts:     5015
+Total Committed uOps:      6271
+Aggregate Throughput (IPC):2.269 inst/cycle (uOp IPC: 2.838)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.000048 s
-  Simulation Speed:        0.39 M-Ticks/s
-  Simulation MIPS:         0.39 MIPS
-  Simulation Slowdown:     2532.9x
+  Host Wall-Clock Time:    0.001842 s
+  Simulation Speed:        1.20 M-Ticks/s
+  Simulation MIPS:         2.72 MIPS
+  Simulation Slowdown:     833.6x
 ------------------------------------------------------------
 [ Core 0 Summary ]
-  Committed Insts / uOps:  19 / 22 (uOp Ratio: 1.16x)
-  Core Throughput (IPC):   1.000 inst/cycle
-  Branch Predictions:      3 (Accuracy: 100.0%)
-  Branch Mispredicts:      0 (Penalty Flushes: 0)
-  L1I Cache Hit Rate:      94.74% (18/19)
-  L1D Cache Hit Rate:      75.00% (3/4)
-  Loads / Stores:          4 / 3
-  Store-to-Load Forwards:  3 (Rate: 75.00%)
+  Committed Insts / uOps:  5015 / 6271 (uOp Ratio: 1.25x)
+  Core Throughput (IPC):   2.269 inst/cycle
+  Branch Predictions:      251 (Accuracy: 99.2%)
+  Branch Mispredicts:      2 (Penalty Flushes: 2)
+  L1I Cache Hit Rate:      99.87% (1520/1522)
+  L1D Cache Hit Rate:      99.84% (1257/1259)
+  Loads / Stores:          1251 / 1256
+  Store-to-Load Forwards:  1248 (Rate: 99.76%)
   Mem Order Violations:    0
   --- Top-Down Breakdown (Level 1) ---
     Frontend Bound:        0.00%
     Bad Speculation:       0.00%
-    Backend Bound:         0.00%
-    Retiring:              100.00%
+    Backend Bound:         24.55%
+    Retiring:              75.45%
   --- Detailed Execution Ports ---
-    Port ALU uOps:         8
+    Port ALU uOps:         2257
     Port MUL uOps:         0
     Port DIV uOps:         0
-    Port Branch uOps:      3
-    Port LSU uOps:         16
+    Port Branch uOps:      251
+    Port LSU uOps:         5517
   --- Pipeline Stalls Breakdown ---
-    ROB Full Stalls:       0 cycles
-    RS/IQ Full Stalls:     0 cycles
+    ROB Full Stalls:       1954 cycles
+    RS/IQ Full Stalls:     87 cycles
     PRF Exhaustion Stalls: 0 cycles
     LQ / SQ Full Stalls:   0 / 0 cycles
     Head-of-ROB Stalls:    0 cycles
   --- Branch Predictor Diagnostics ---
-    Direct Cond / Uncond:  3 / 0
+    Direct Cond / Uncond:  251 / 0
     Calls / Returns:       0 / 0
     Indirect Branches:     0
-    BTB Hits / Misses:     0 / 3 (Hit Rate: 0.00%)
+    Mispredict Dir / BTB:  2 / 0
+    Squashed Spec Branches:3
+    BTB Hits / Misses:     251 / 3 (Hit Rate: 98.82%)
     RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
     RAS Pushes / Pops:     0 / 0
-    TAGE Provider Hits:    0
+    TAGE Provider Hits:    2
   --- LSU & Memory Disambiguation ---
-    Store-to-Load Forwards:3
+    Store-to-Load Forwards:1248
     Store Data Replays:    0
     Memory Order Flushes:  0
   --- Cache & MSHR Subsystem ---
-    L1I Misses / Evictions:1 / 0
-    L1D Misses / Evictions:1 / 0
+    L1I Misses / Evictions:2 / 0
+    L1D Misses / Evictions:2 / 0
     L1D Dirty Writebacks:  0
     L1D MSHR Allocations:  0 (Stalls: 0)
   --- Top-Down Breakdown (Level 2) ---
-    Retiring Base ALU:     12 slots
-    Retiring Mem:          10 slots
+    Retiring Base ALU:     2508 slots
+    Retiring Mem:          3763 slots
     FE L1I Miss:           0 slots
     FE Fetch Bubbles:      0 slots
-    BE Core RS Full:       0 slots
-    BE Core ROB Full:      0 slots
+    BE Core RS Full:       87 slots
+    BE Core ROB Full:      1954 slots
     BE Core FreeList Empty:0 slots
     BE Mem L1D Miss:       0 slots
     BE Mem MSHR Full:      0 slots
@@ -137,8 +139,8 @@ Active Core Count:         1
     BE Mem StoreBuf Full:  0 slots
 ------------------------------------------------------------
 [ Shared L2 Cache & Coherence ]
-  L2 Accesses:             0
-  L2 Hits / Misses:        0 / 0 (Hit Rate: 0.00%)
+  L2 Accesses:             4
+  L2 Hits / Misses:        1 / 3 (Hit Rate: 25.00%)
   L2 Evictions / WB:       0 / 0
   MESI Snoop Broadcasts:   0
   MESI Line Invalidations: 0

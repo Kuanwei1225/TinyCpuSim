@@ -1,24 +1,24 @@
 ================================================================================
                   TinyCpuSim uArch Simulation Performance Report                
 ================================================================================
-  Target Program:        /Users/kuanwei/workspace/TinySim/tests/fixtures/test_sort.elf
-  Generation Timestamp:  2026-09-26 23:14:36
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Target Program:        /home/kw/workspace/TinyCpuSim/tests/fixtures/test_sort.elf
+  Generation Timestamp:  2026-09-28 21:55:09
+  Applied Configuration: /home/kw/workspace/TinyCpuSim/configs/current.cfg
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
-Loading ELF: /Users/kuanwei/workspace/TinySim/tests/fixtures/test_sort.elf...
+Loading ELF: /home/kw/workspace/TinyCpuSim/tests/fixtures/test_sort.elf...
 Microarchitecture Simulation Mode ENABLED
-  Cores: 1 | OoO: Yes | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
+  Cores: 1 | Core: OoO (Tomasulo) | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
 Entry Point: 0x10000
 Starting simulation...
 
 ============================================================
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
-Total Instructions: 148
-Elapsed Time:       0.000062 s
-Simulation Speed:   2390296.69 inst/s (2.39 MIPS)
+Total Instructions: 7777
+Elapsed Time:       0.004749 s
+Simulation Speed:   1637453.79 inst/s (1.64 MIPS)
 ============================================================
 
 
@@ -26,70 +26,72 @@ Simulation Speed:   2390296.69 inst/s (2.39 MIPS)
                TinyCpuSim uArch Simulation Report           
 ============================================================
 Simulated Target Clock:    1000.00 MHz
-Simulated Target Time:     1.2000e-07 s
-Simulated Total Cycles:    120 ticks
-Total Committed Insts:     148
-Total Committed uOps:      160
-Aggregate Throughput (IPC):1.233 inst/cycle (uOp IPC: 1.333)
+Simulated Target Time:     3.2400e-06 s
+Simulated Total Cycles:    3240 ticks
+Total Committed Insts:     7777
+Total Committed uOps:      8801
+Aggregate Throughput (IPC):2.400 inst/cycle (uOp IPC: 2.716)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.000062 s
-  Simulation Speed:        1.94 M-Ticks/s
-  Simulation MIPS:         2.39 MIPS
-  Simulation Slowdown:     516.0x
+  Host Wall-Clock Time:    0.004749 s
+  Simulation Speed:        0.68 M-Ticks/s
+  Simulation MIPS:         1.64 MIPS
+  Simulation Slowdown:     1465.9x
 ------------------------------------------------------------
 [ Core 0 Summary ]
-  Committed Insts / uOps:  148 / 160 (uOp Ratio: 1.08x)
-  Core Throughput (IPC):   1.233 inst/cycle
-  Branch Predictions:      50 (Accuracy: 82.0%)
-  Branch Mispredicts:      9 (Penalty Flushes: 9)
-  L1I Cache Hit Rate:      99.48% (380/382)
-  L1D Cache Hit Rate:      97.06% (33/34)
-  Loads / Stores:          26 / 12
-  Store-to-Load Forwards:  4 (Rate: 15.38%)
+  Committed Insts / uOps:  7777 / 8801 (uOp Ratio: 1.13x)
+  Core Throughput (IPC):   2.400 inst/cycle
+  Branch Predictions:      1749 (Accuracy: 96.6%)
+  Branch Mispredicts:      59 (Penalty Flushes: 59)
+  L1I Cache Hit Rate:      99.93% (2849/2851)
+  L1D Cache Hit Rate:      99.82% (1623/1626)
+  Loads / Stores:          1106 / 1024
+  Store-to-Load Forwards:  504 (Rate: 45.57%)
   Mem Order Violations:    0
   --- Top-Down Breakdown (Level 1) ---
     Frontend Bound:        0.00%
     Bad Speculation:       0.00%
-    Backend Bound:         7.51%
-    Retiring:              92.49%
+    Backend Bound:         11.20%
+    Retiring:              88.80%
   --- Detailed Execution Ports ---
-    Port ALU uOps:         86
+    Port ALU uOps:         4316
     Port MUL uOps:         0
     Port DIV uOps:         0
-    Port Branch uOps:      50
-    Port LSU uOps:         64
+    Port Branch uOps:      1749
+    Port LSU uOps:         3273
   --- Pipeline Stalls Breakdown ---
-    ROB Full Stalls:       0 cycles
-    RS/IQ Full Stalls:     13 cycles
+    ROB Full Stalls:       1030 cycles
+    RS/IQ Full Stalls:     80 cycles
     PRF Exhaustion Stalls: 0 cycles
     LQ / SQ Full Stalls:   0 / 0 cycles
     Head-of-ROB Stalls:    0 cycles
   --- Branch Predictor Diagnostics ---
-    Direct Cond / Uncond:  32 / 18
+    Direct Cond / Uncond:  1170 / 579
     Calls / Returns:       0 / 0
     Indirect Branches:     0
-    BTB Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
+    Mispredict Dir / BTB:  59 / 0
+    Squashed Spec Branches:404
+    BTB Hits / Misses:     1893 / 189 (Hit Rate: 90.92%)
     RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
     RAS Pushes / Pops:     0 / 0
-    TAGE Provider Hits:    0
+    TAGE Provider Hits:    1178
   --- LSU & Memory Disambiguation ---
-    Store-to-Load Forwards:4
+    Store-to-Load Forwards:504
     Store Data Replays:    0
     Memory Order Flushes:  0
   --- Cache & MSHR Subsystem ---
     L1I Misses / Evictions:2 / 0
-    L1D Misses / Evictions:1 / 0
+    L1D Misses / Evictions:3 / 0
     L1D Dirty Writebacks:  0
     L1D MSHR Allocations:  0 (Stalls: 0)
   --- Top-Down Breakdown (Level 2) ---
-    Retiring Base ALU:     112 slots
-    Retiring Mem:          48 slots
+    Retiring Base ALU:     5729 slots
+    Retiring Mem:          3072 slots
     FE L1I Miss:           0 slots
     FE Fetch Bubbles:      0 slots
-    BE Core RS Full:       13 slots
-    BE Core ROB Full:      0 slots
+    BE Core RS Full:       80 slots
+    BE Core ROB Full:      1030 slots
     BE Core FreeList Empty:0 slots
     BE Mem L1D Miss:       0 slots
     BE Mem MSHR Full:      0 slots
@@ -97,8 +99,8 @@ Active Core Count:         1
     BE Mem StoreBuf Full:  0 slots
 ------------------------------------------------------------
 [ Shared L2 Cache & Coherence ]
-  L2 Accesses:             0
-  L2 Hits / Misses:        0 / 0 (Hit Rate: 0.00%)
+  L2 Accesses:             5
+  L2 Hits / Misses:        0 / 5 (Hit Rate: 0.00%)
   L2 Evictions / WB:       0 / 0
   MESI Snoop Broadcasts:   0
   MESI Line Invalidations: 0

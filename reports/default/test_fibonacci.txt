@@ -1,15 +1,15 @@
 ================================================================================
                   TinyCpuSim uArch Simulation Performance Report                
 ================================================================================
-  Target Program:        /Users/kuanwei/workspace/TinySim/tests/fixtures/test_fibonacci.elf
-  Generation Timestamp:  2026-09-26 23:14:55
-  Applied Configuration: /Users/kuanwei/workspace/TinySim/configs/default/default.cfg
+  Target Program:        /home/kw/workspace/TinyCpuSim/tests/fixtures/test_fibonacci.elf
+  Generation Timestamp:  2026-09-28 21:55:05
+  Applied Configuration: /home/kw/workspace/TinyCpuSim/configs/current.cfg
 --------------------------------------------------------------------------------
 
 TinyCpuSim v0.1.0
-Loading ELF: /Users/kuanwei/workspace/TinySim/tests/fixtures/test_fibonacci.elf...
+Loading ELF: /home/kw/workspace/TinyCpuSim/tests/fixtures/test_fibonacci.elf...
 Microarchitecture Simulation Mode ENABLED
-  Cores: 1 | OoO: Yes | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
+  Cores: 1 | Core: OoO (Tomasulo) | MESI: Enabled | L1D: 32 KB | Shared L2: 0 MB
 Entry Point: 0x10000
 Starting simulation...
 
@@ -17,8 +17,8 @@ Starting simulation...
 SIMULATION PASSED
 Exit Code:          0 (R0 = 0)
 Total Instructions: 1708
-Elapsed Time:       0.000071 s
-Simulation Speed:   24000224.83 inst/s (24.00 MIPS)
+Elapsed Time:       0.001230 s
+Simulation Speed:   1389154.35 inst/s (1.39 MIPS)
 ============================================================
 
 
@@ -26,61 +26,63 @@ Simulation Speed:   24000224.83 inst/s (24.00 MIPS)
                TinyCpuSim uArch Simulation Report           
 ============================================================
 Simulated Target Clock:    1000.00 MHz
-Simulated Target Time:     2.1320e-06 s
-Simulated Total Cycles:    2132 ticks
+Simulated Target Time:     3.1960e-06 s
+Simulated Total Cycles:    3196 ticks
 Total Committed Insts:     1708
 Total Committed uOps:      3301
-Aggregate Throughput (IPC):0.801 inst/cycle (uOp IPC: 1.548)
+Aggregate Throughput (IPC):0.534 inst/cycle (uOp IPC: 1.033)
 Active Core Count:         1
 ------------------------------------------------------------
 [ Host Simulator Performance ]
-  Host Wall-Clock Time:    0.000071 s
-  Simulation Speed:        29.96 M-Ticks/s
-  Simulation MIPS:         24.00 MIPS
-  Simulation Slowdown:     33.4x
+  Host Wall-Clock Time:    0.001230 s
+  Simulation Speed:        2.60 M-Ticks/s
+  Simulation MIPS:         1.39 MIPS
+  Simulation Slowdown:     384.7x
 ------------------------------------------------------------
 [ Core 0 Summary ]
   Committed Insts / uOps:  1708 / 3301 (uOp Ratio: 1.93x)
-  Core Throughput (IPC):   0.801 inst/cycle
-  Branch Predictions:      911 (Accuracy: 74.2%)
-  Branch Mispredicts:      235 (Penalty Flushes: 235)
-  L1I Cache Hit Rate:      99.96% (5608/5610)
-  L1D Cache Hit Rate:      99.64% (1107/1111)
-  Loads / Stores:          634 / 531
-  Store-to-Load Forwards:  54 (Rate: 8.52%)
+  Core Throughput (IPC):   0.534 inst/cycle
+  Branch Predictions:      941 (Accuracy: 72.4%)
+  Branch Mispredicts:      260 (Penalty Flushes: 260)
+  L1I Cache Hit Rate:      99.95% (2119/2120)
+  L1D Cache Hit Rate:      99.74% (1156/1159)
+  Loads / Stores:          676 / 531
+  Store-to-Load Forwards:  48 (Rate: 7.10%)
   Mem Order Violations:    0
   --- Top-Down Breakdown (Level 1) ---
     Frontend Bound:        0.00%
     Bad Speculation:       0.00%
-    Backend Bound:         0.00%
-    Retiring:              100.00%
+    Backend Bound:         3.65%
+    Retiring:              96.35%
   --- Detailed Execution Ports ---
-    Port ALU uOps:         1465
+    Port ALU uOps:         1490
     Port MUL uOps:         0
     Port DIV uOps:         0
-    Port Branch uOps:      700
-    Port LSU uOps:         1815
+    Port Branch uOps:      716
+    Port LSU uOps:         1865
   --- Pipeline Stalls Breakdown ---
-    ROB Full Stalls:       0 cycles
-    RS/IQ Full Stalls:     0 cycles
+    ROB Full Stalls:       1 cycles
+    RS/IQ Full Stalls:     124 cycles
     PRF Exhaustion Stalls: 0 cycles
     LQ / SQ Full Stalls:   0 / 0 cycles
     Head-of-ROB Stalls:    0 cycles
   --- Branch Predictor Diagnostics ---
     Direct Cond / Uncond:  321 / 0
-    Calls / Returns:       379 / 0
+    Calls / Returns:       395 / 225
     Indirect Branches:     0
-    BTB Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
-    RAS Hits / Misses:     0 / 0 (Hit Rate: 0.00%)
-    RAS Pushes / Pops:     0 / 0
-    TAGE Provider Hits:    0
+    Mispredict Dir / BTB:  123 / 137
+    Squashed Spec Branches:1450
+    BTB Hits / Misses:     2082 / 43 (Hit Rate: 97.98%)
+    RAS Hits / Misses:     346 / 0 (Hit Rate: 100.00%)
+    RAS Pushes / Pops:     395 / 225
+    TAGE Provider Hits:    1044
   --- LSU & Memory Disambiguation ---
-    Store-to-Load Forwards:54
+    Store-to-Load Forwards:48
     Store Data Replays:    0
     Memory Order Flushes:  0
   --- Cache & MSHR Subsystem ---
-    L1I Misses / Evictions:2 / 0
-    L1D Misses / Evictions:4 / 0
+    L1I Misses / Evictions:1 / 0
+    L1D Misses / Evictions:3 / 0
     L1D Dirty Writebacks:  0
     L1D MSHR Allocations:  0 (Stalls: 0)
   --- Top-Down Breakdown (Level 2) ---
@@ -88,8 +90,8 @@ Active Core Count:         1
     Retiring Mem:          1417 slots
     FE L1I Miss:           0 slots
     FE Fetch Bubbles:      0 slots
-    BE Core RS Full:       0 slots
-    BE Core ROB Full:      0 slots
+    BE Core RS Full:       124 slots
+    BE Core ROB Full:      1 slots
     BE Core FreeList Empty:0 slots
     BE Mem L1D Miss:       0 slots
     BE Mem MSHR Full:      0 slots
@@ -97,8 +99,8 @@ Active Core Count:         1
     BE Mem StoreBuf Full:  0 slots
 ------------------------------------------------------------
 [ Shared L2 Cache & Coherence ]
-  L2 Accesses:             0
-  L2 Hits / Misses:        0 / 0 (Hit Rate: 0.00%)
+  L2 Accesses:             4
+  L2 Hits / Misses:        0 / 4 (Hit Rate: 0.00%)
   L2 Evictions / WB:       0 / 0
   MESI Snoop Broadcasts:   0
   MESI Line Invalidations: 0

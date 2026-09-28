@@ -717,3 +717,73 @@ TEST(BpuFrontendUBenchTest, BPU_UBench_FullPipelineMultiBufferSquashAccounting) 
     std::cout << "[PERF_COUNTER] BPU_UBench_FullPipelineMultiBufferSquashAccounting:squashed_branches=" << stats.branch.squashed_branches << std::endl;
 }
 
+// 15. Comprehensive Multi-Phase Branch Prediction Stress (500+ Iterations TNTN, Periodic, & Correlation)
+TEST(BpuFrontendUBenchTest, BPU_UBench_MultiPhasePeriodicAndCorrelatedBranches) {
+    BranchPredictorConfig cfg;
+    cfg.type = PredictorType::BIMODAL;
+    cfg.table_size = 8192;
+    cfg.btb_size = 2048;
+    cfg.ras_size = 16;
+    CompositeBranchPredictor bpu(cfg);
+
+    const uint32_t br_tntn = 0x1000;
+    const uint32_t target_tntn = 0x1040;
+    const uint32_t br_periodic = 0x2000;
+    const uint32_t target_periodic = 0x2040;
+    const uint32_t br_outer = 0x3000;
+    const uint32_t target_outer = 0x3040;
+    const uint32_t br_inner = 0x3010;
+    const uint32_t target_inner = 0x3080;
+
+    int total_correct = 0;
+
+    // Phase 1: 500 iterations of Alternating TNTN pattern
+    for (int i = 0; i < 500; ++i) {
+        bool actual_taken = (i % 2 == 1);
+        auto pred = bpu.predict(br_tntn, BranchType::DIRECT_COND, true);
+        if (i >= 50 && pred.taken == actual_taken) {
+            total_correct++;
+        }
+        bpu.update(br_tntn, actual_taken, actual_taken ? target_tntn : br_tntn + 4, BranchType::DIRECT_COND, pred);
+        if (pred.taken != actual_taken) {
+            bpu.squash(pred, actual_taken);
+        }
+    }
+
+    // Phase 2: 400 iterations of 4-step Periodic pattern (TTNT)
+    for (int i = 0; i < 400; ++i) {
+        bool actual_taken = (i % 4 != 2);
+        auto pred = bpu.predict(br_periodic, BranchType::DIRECT_COND, true);
+        if (i >= 50 && pred.taken == actual_taken) {
+            total_correct++;
+        }
+        bpu.update(br_periodic, actual_taken, actual_taken ? target_periodic : br_periodic + 4, BranchType::DIRECT_COND, pred);
+        if (pred.taken != actual_taken) {
+            bpu.squash(pred, actual_taken);
+        }
+    }
+
+    // Phase 3: 300 iterations of Correlated Branches
+    for (int i = 0; i < 300; ++i) {
+        bool outer_taken = (i % 2 == 1);
+        bool inner_taken = outer_taken ? ((i % 4) == 3) : ((i % 4) == 0);
+
+        auto pred_outer = bpu.predict(br_outer, BranchType::DIRECT_COND, true);
+        bpu.update(br_outer, outer_taken, outer_taken ? target_outer : br_outer + 4, BranchType::DIRECT_COND, pred_outer);
+        if (pred_outer.taken != outer_taken) bpu.squash(pred_outer, outer_taken);
+
+        auto pred_inner = bpu.predict(br_inner, BranchType::DIRECT_COND, true);
+        if (i >= 50 && pred_inner.taken == inner_taken) {
+            total_correct++;
+        }
+        bpu.update(br_inner, inner_taken, inner_taken ? target_inner : br_inner + 4, BranchType::DIRECT_COND, pred_inner);
+        if (pred_inner.taken != inner_taken) bpu.squash(pred_inner, inner_taken);
+    }
+
+    // Total steady state evaluated: 450 + 350 + 250 = 1050 predictions.
+    // Steady state accuracy must achieve >= 98% (>= 1030 correct)
+    EXPECT_GE(total_correct, 1030);
+    std::cout << "[PERF_COUNTER] BPU_UBench_MultiPhasePeriodicAndCorrelatedBranches:steady_correct=" << total_correct << std::endl;
+}
+
+
