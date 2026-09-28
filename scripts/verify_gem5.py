@@ -168,6 +168,8 @@ def _eval_single_workload(args_tuple):
 def main():
     default_jobs = max(1, (os.cpu_count() or 4) // 2)
     parser = argparse.ArgumentParser(description="TinyCpuSim vs gem5 Golden Architectural Verification & Correlation")
+    parser.add_argument("workloads", nargs="*", help="Optional specific ELF fixture names or paths to verify")
+    parser.add_argument("-a", "--all", action="store_true", default=True, help="Verify against all golden reference benchmarks (default)")
     parser.add_argument("-j", "--jobs", type=int, default=default_jobs, help=f"Parallel worker threads/processes (default: {default_jobs}, half of CPU cores)")
     parser.add_argument("-c", "--config", default=DEFAULT_CFG, help=f"TinySim config file (default: {DEFAULT_CFG})")
     args = parser.parse_args()
@@ -175,6 +177,16 @@ def main():
     if not os.path.exists(SIM_BIN):
         print("Building simulator binary...")
         subprocess.run(["cmake", "--build", BUILD_DIR, "-j", str(args.jobs)], check=True)
+
+    selected_workloads = []
+    if args.workloads:
+        for w in args.workloads:
+            base = os.path.basename(w)
+            if not base.endswith(".elf"):
+                base += ".elf"
+            selected_workloads.append(base)
+    else:
+        selected_workloads = list(WORKLOADS)
 
     print("=" * 96)
     print("           TinyCpuSim vs gem5 Golden Architectural Verification & Correlation           ")
@@ -184,7 +196,7 @@ def main():
     print(f"  Parallel Workers:           {args.jobs} (half of CPU cores)")
     print("-" * 96)
 
-    workload_args = [(elf_name, args.config) for elf_name in WORKLOADS]
+    workload_args = [(elf_name, args.config) for elf_name in selected_workloads]
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
         eval_results = list(executor.map(_eval_single_workload, workload_args))
 
