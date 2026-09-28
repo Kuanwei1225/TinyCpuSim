@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 Custom ELF32 Thumb Assembler & Builder for TinyCpuSim Test Fixtures
 """
@@ -8,16 +8,21 @@ import sys
 import glob
 import struct
 import re
+import subprocess
 
-extra_paths = [
-    "/home/kw/snap/antigravity-cli/common/local/lib/python3.14/dist-packages",
-    "/home/kw/snap/antigravity-cli/common/local/lib/python3.12/site-packages",
-]
-for p in extra_paths:
-    if os.path.exists(p) and p not in sys.path:
-        sys.path.insert(0, p)
+# Standard tool resolver for default system locations
+def find_default_tool(name):
+    for candidate in [
+        f"/usr/bin/{name}",
+        f"/usr/local/bin/{name}",
+        f"/opt/homebrew/bin/{name}",
+        f"/bin/{name}"
+    ]:
+        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
-import keystone
+ARM_GCC = find_default_tool("arm-none-eabi-gcc")
 
 def clean_asm(text, base_addr=0x10000):
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
@@ -59,7 +64,11 @@ def clean_asm(text, base_addr=0x10000):
         asm_code = re.sub(rf'={lbl}\b', f'={hex(addr)}', asm_code)
     return asm_code
 
-def build_elf(asm_text, output_path, load_addr=0x00010000, bss_size=0x10000):
+def build_elf_keystone(asm_text, output_path, load_addr=0x00010000, bss_size=0x10000):
+    try:
+        import keystone
+    except ImportError:
+        raise RuntimeError("Neither 'arm-none-eabi-gcc' nor 'keystone' python module is available to assemble test fixtures.")
     cleaned_asm = clean_asm(asm_text, load_addr)
     ks = keystone.Ks(keystone.KS_ARCH_ARM, keystone.KS_MODE_THUMB)
     encoding, count = ks.asm(cleaned_asm, load_addr)
@@ -124,15 +133,35 @@ def build_elf(asm_text, output_path, load_addr=0x00010000, bss_size=0x10000):
     print(f"[OK] Generated ELF: {os.path.basename(output_path):<24} (Code: {len(code_bytes)} bytes, Entry: {hex(entry_point)})")
 
 def build_from_source(asm_path, output_path=None):
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_name = os.path.splitext(os.path.basename(asm_path))[0]
     if output_path is None:
-        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        base_name = os.path.splitext(os.path.basename(asm_path))[0]
         output_path = os.path.join(root_dir, "tests", "fixtures", f"{base_name}.elf")
         
+    linker_script = os.path.join(root_dir, "tests", "asm", "linker.ld")
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+    if ARM_GCC and os.path.exists(linker_script):
+        cmd = [
+            ARM_GCC,
+            "-mcpu=cortex-m3",
+            "-mthumb",
+            "-nostdlib",
+            "-T", linker_script,
+            asm_path,
+            "-o", output_path
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0:
+            print(f"[OK] Assembled with {ARM_GCC}: {os.path.basename(output_path)}")
+            return
+        else:
+            print(f"[WARN] {ARM_GCC} assembly failed ({res.stderr.strip()}), falling back to python builder...")
+
     with open(asm_path, "r") as f:
         asm_text = f.read()
         
-    build_elf(asm_text, output_path)
+    build_elf_keystone(asm_text, output_path)
 
 import concurrent.futures
 import argparse

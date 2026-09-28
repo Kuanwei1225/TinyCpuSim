@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyArmSim vs gem5 Golden Reference Accuracy Comparator
 Parses TinyArmSim performance report and gem5 stats.txt, calculating precision deltas.

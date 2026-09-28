@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim Microbenchmark Performance Suite & Configuration Sensitivity Engine
 Evaluates component microbenchmarks, captures cycle-accurate hardware timing,
@@ -14,6 +14,19 @@ import subprocess
 import datetime
 import glob
 import configparser
+
+def find_default_tool(name):
+    for candidate in [
+        f"/usr/bin/{name}",
+        f"/usr/local/bin/{name}",
+        f"/opt/homebrew/bin/{name}",
+        f"/bin/{name}"
+    ]:
+        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return name
+
+CMAKE_BIN = find_default_tool("cmake")
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
@@ -267,7 +280,7 @@ def run_single_suite(suite_key, sim_bin, active_cfg):
     
     if not os.path.exists(bin_path):
         print(f"Building {suite_info['binary']}...")
-        subprocess.run(["cmake", "--build", BUILD_DIR, "--target", suite_info["binary"], "-j4"], check=True)
+        subprocess.run([CMAKE_BIN, "--build", BUILD_DIR, "--target", suite_info["binary"], "-j4"], check=True)
 
     start_time = datetime.datetime.now()
     res = subprocess.run([bin_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

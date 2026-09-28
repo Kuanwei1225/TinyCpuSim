@@ -1,10 +1,33 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # [Step 2] TinyCpuSim Regression Test Runner
-# Runs the full suite of 156+ unit and microarchitectural tests.
+# Runs the full suite of 168+ unit and microarchitectural tests.
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/build"
+
+# Resolve default installation paths for tools, avoiding reliance on env/PATH
+find_default_tool() {
+    local name="$1"
+    for candidate in \
+        "/usr/bin/${name}" \
+        "/usr/local/bin/${name}" \
+        "/opt/homebrew/bin/${name}" \
+        "/bin/${name}"; do
+        if [ -x "${candidate}" ]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    # Fallback only if not in default installation directories
+    if command -v "${name}" >/dev/null 2>&1; then
+        command -v "${name}"
+        return 0
+    fi
+    echo "${name}"
+}
+
+CTEST_BIN=$(find_default_tool "ctest")
 
 if [ ! -d "${BUILD_DIR}" ]; then
     echo "Build directory not found. Running Step 1 first..."
@@ -20,8 +43,9 @@ JOBS=${JOBS:-${HALF_CORES}}
 echo "============================================================"
 echo " [Step 2/5] Running Full Regression Suite (Parallel: ${JOBS} workers)"
 echo "============================================================"
+echo " CTest Path: ${CTEST_BIN}"
 
-ctest -j"${JOBS}" --output-on-failure "$@"
+"${CTEST_BIN}" -j"${JOBS}" --output-on-failure "$@"
 
 echo ""
 echo "============================================================"

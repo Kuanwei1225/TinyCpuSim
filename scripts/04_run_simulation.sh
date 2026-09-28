@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # [Step 4] TinyCpuSim Full-System Simulation Runner
 # Runs cycle-accurate Out-of-Order or pure ISA simulation on bare-metal ELF binaries.
 # By default, reads configs/current.cfg automatically so no CLI arguments are needed.
@@ -10,6 +10,27 @@ BIN="${BUILD_DIR}/tinycpusim"
 REPORTS_DIR="${PROJECT_ROOT}/reports"
 CURRENT_CFG="${PROJECT_ROOT}/configs/current.cfg"
 
+# Resolve default installation path for Python, avoiding env/PATH where possible
+find_default_python() {
+    for candidate in \
+        "/usr/bin/python3" \
+        "/usr/local/bin/python3" \
+        "/opt/homebrew/bin/python3" \
+        "/usr/bin/python"; do
+        if [ -x "${candidate}" ]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    if command -v python3 >/dev/null 2>&1; then
+        command -v python3
+        return 0
+    fi
+    echo "python3"
+}
+
+PYTHON_BIN=$(find_default_python)
+
 if [ ! -f "${BIN}" ]; then
     echo "Simulator binary not found. Running Step 1 first..."
     "${PROJECT_ROOT}/scripts/01_build.sh"
@@ -19,11 +40,11 @@ mkdir -p "${REPORTS_DIR}"
 
 # If current.cfg does not exist, initialize from default
 if [ ! -f "${CURRENT_CFG}" ]; then
-    python3 "${PROJECT_ROOT}/scripts/config.py" reset
+    "${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/config.py" reset
 fi
 
 # Extract settings from configs/current.cfg using python
-CONFIG_SETTINGS=$(python3 -c "
+CONFIG_SETTINGS=$("${PYTHON_BIN}" -c "
 import configparser
 cfg = configparser.ConfigParser()
 cfg.read('${CURRENT_CFG}')

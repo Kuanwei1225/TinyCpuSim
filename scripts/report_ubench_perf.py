@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim Microbenchmark Performance Counter vs gem5 Empirical Oracle Comparator
 (scripts/report_ubench_perf.py)

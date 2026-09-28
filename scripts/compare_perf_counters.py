@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim vs gem5 Detailed Stage-by-Stage Performance Counter Comparator (scripts/compare_perf_counters.py)
 Compares fine-grained performance counters between gem5 stats.txt and TinyCpuSim uArch report

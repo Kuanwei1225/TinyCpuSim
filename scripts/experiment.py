@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim Microarchitectural Experiment & Parameter Exploration Utility
 Allows tuning any hardware parameter on single or multiple ELF programs,

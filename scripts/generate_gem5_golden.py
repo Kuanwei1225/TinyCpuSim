@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 Generate gem5 Golden Reference Stats for TinyArmSim Benchmarks
 Runs gem5 once per test fixture in parallel and stores the golden stats in tests/golden/gem5/

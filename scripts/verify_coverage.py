@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 verify_coverage.py - TinyArmSim Automated Test & ISA Coverage Verification Tool
 

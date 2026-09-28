@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim gem5 Golden Verification & Correlation Analysis Suite (scripts/verify_gem5.py)
 Automates running all 9 benchmark ELFs against golden gem5 hardware performance statistics,
@@ -12,6 +12,19 @@ import re
 import subprocess
 import glob
 import math
+
+def find_default_tool(name):
+    for candidate in [
+        f"/usr/bin/{name}",
+        f"/usr/local/bin/{name}",
+        f"/opt/homebrew/bin/{name}",
+        f"/bin/{name}"
+    ]:
+        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return name
+
+CMAKE_BIN = find_default_tool("cmake")
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
@@ -176,7 +189,7 @@ def main():
 
     if not os.path.exists(SIM_BIN):
         print("Building simulator binary...")
-        subprocess.run(["cmake", "--build", BUILD_DIR, "-j", str(args.jobs)], check=True)
+        subprocess.run([CMAKE_BIN, "--build", BUILD_DIR, "-j", str(args.jobs)], check=True)
 
     selected_workloads = []
     if args.workloads:

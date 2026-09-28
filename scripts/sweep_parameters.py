@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim Microarchitecture Parameter Sweep Utility
 Runs parameter sweeps (e.g. ROB Size, Issue Width, L1 Cache Size, Branch Predictor)

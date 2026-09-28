@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 gem5 Configuration Extractor & TinySim Configuration Generator (scripts/gem5_to_tinyconfig.py)
 Parses gem5 config.ini / config.json from a simulated golden run and generates

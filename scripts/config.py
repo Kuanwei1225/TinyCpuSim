@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 TinyCpuSim Configuration Lifecycle Manager (scripts/config.py)
 Direct vi editor integration, clean preset loading from default/, save/, and sweep/,

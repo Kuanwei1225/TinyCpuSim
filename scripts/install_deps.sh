@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # TinyCpuSim Prerequisites & Dependencies Installer
 # Automatically installs C++ compilers, CMake, ARM cross-toolchain, and Python packages.
 # NOTE: gem5 is OPTIONAL and not required for normal simulation, tests, or ubench verifications.
@@ -6,6 +6,27 @@
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Resolve default installation path for Python, avoiding env/PATH where possible
+find_default_python() {
+    for candidate in \
+        "/usr/bin/python3" \
+        "/usr/local/bin/python3" \
+        "/opt/homebrew/bin/python3" \
+        "/usr/bin/python"; do
+        if [ -x "${candidate}" ]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    if command -v python3 >/dev/null 2>&1; then
+        command -v python3
+        return 0
+    fi
+    echo "python3"
+}
+
+PYTHON_BIN=$(find_default_python)
 
 echo "============================================================"
 echo "       TinyCpuSim - Dependencies & Environment Setup        "
@@ -87,8 +108,11 @@ esac
 
 echo ""
 echo "[STEP 2/2] Installing Python Microarchitecture & Assembler Packages..."
-python3 -m pip install --upgrade pip 2>/dev/null || true
-python3 -m pip install pyelftools keystone-engine capstone pydot
+echo " Using Python: ${PYTHON_BIN}"
+"${PYTHON_BIN}" -m pip install --upgrade pip 2>/dev/null || true
+"${PYTHON_BIN}" -m pip install --break-system-packages pyelftools keystone-engine capstone pydot 2>/dev/null || \
+"${PYTHON_BIN}" -m pip install --user pyelftools keystone-engine capstone pydot 2>/dev/null || \
+"${PYTHON_BIN}" -m pip install pyelftools keystone-engine capstone pydot || true
 
 echo ""
 echo "============================================================"
