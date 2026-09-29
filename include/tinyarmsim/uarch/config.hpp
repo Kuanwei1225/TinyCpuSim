@@ -10,9 +10,9 @@
 namespace tinyarmsim::uarch {
 
 enum class CoreType {
-    OOO_TOMASULO,
-    SIMPLE_INORDER,
-    FAST_FEEDER
+    OOO_DYNAMIC,   // Modern Out-of-Order dynamic scheduling (Unified RS/IQ + PRF + ROB)
+    SIMPLE_INORDER,// Strict in-order execution
+    FAST_FEEDER    // High-throughput fast feeder for memory/cache exploration
 };
 
 enum class ReplacementPolicy {
@@ -146,7 +146,7 @@ struct LsuConfig {
 };
 
 struct CoreConfig {
-    CoreType type{CoreType::OOO_TOMASULO};
+    CoreType type{CoreType::OOO_DYNAMIC};
     uint32_t fetch_width{4};
     uint32_t decode_width{4};
     uint32_t rename_width{4};
@@ -162,7 +162,7 @@ struct CoreConfig {
     LsuConfig lsu{};
 
     [[nodiscard]] bool is_ooo() const noexcept {
-        return type == CoreType::OOO_TOMASULO;
+        return type == CoreType::OOO_DYNAMIC;
     }
 
     [[nodiscard]] bool is_fast_feeder() const noexcept {
@@ -362,12 +362,12 @@ struct UArchConfig {
                 else if (key == "dram_latency" || key == "dram_latency_cycles") cfg.dram_latency_cycles = static_cast<uint32_t>(std::stoul(val));
             } else if (current_section == "core") {
                 if (key == "type" || key == "mode") {
-                    if (u_val == "OOO_TOMASULO" || u_val == "OOO") cfg.default_core.type = CoreType::OOO_TOMASULO;
+                    if (u_val == "OOO_DYNAMIC" || u_val == "OOO_RS_PRF" || u_val == "OOO_TOMASULO" || u_val == "OOO") cfg.default_core.type = CoreType::OOO_DYNAMIC;
                     else if (u_val == "SIMPLE_INORDER" || u_val == "INORDER" || u_val == "IN_ORDER") cfg.default_core.type = CoreType::SIMPLE_INORDER;
                     else if (u_val == "FAST_FEEDER" || u_val == "FEEDER" || u_val == "BYPASS") cfg.default_core.type = CoreType::FAST_FEEDER;
                 }
                 else if (key == "enable_ooo" || key == "ooo") {
-                    cfg.default_core.type = parse_bool(val) ? CoreType::OOO_TOMASULO : CoreType::SIMPLE_INORDER;
+                    cfg.default_core.type = parse_bool(val) ? CoreType::OOO_DYNAMIC : CoreType::SIMPLE_INORDER;
                 }
                 else if (key == "fetch_width") cfg.default_core.fetch_width = static_cast<uint32_t>(std::stoul(val));
                 else if (key == "decode_width") cfg.default_core.decode_width = static_cast<uint32_t>(std::stoul(val));

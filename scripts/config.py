@@ -112,9 +112,9 @@ def validate_file(file_path):
             errors.append(f"Invalid coherence protocol: '{coh}'. Must be MESI or NONE.")
 
     if cfg.has_section("core"):
-        c_type = cfg.get("core", "type", fallback="OOO_TOMASULO").upper()
-        if c_type not in ["OOO_TOMASULO", "OOO", "SIMPLE_INORDER", "INORDER", "FAST_FEEDER", "FEEDER", "BYPASS"]:
-            errors.append(f"Invalid core type: '{c_type}'. Must be OOO_TOMASULO, SIMPLE_INORDER, or FAST_FEEDER.")
+        c_type = cfg.get("core", "type", fallback="OOO_DYNAMIC").upper()
+        if c_type not in ["OOO_DYNAMIC", "OOO_RS_PRF", "OOO_TOMASULO", "OOO", "SIMPLE_INORDER", "INORDER", "FAST_FEEDER", "FEEDER", "BYPASS"]:
+            errors.append(f"Invalid core type: '{c_type}'. Must be OOO_DYNAMIC, SIMPLE_INORDER, or FAST_FEEDER.")
         for w in ["fetch_width", "decode_width", "rename_width", "issue_width", "commit_width"]:
             val = cfg.getint("core", w, fallback=4)
             if val <= 0: errors.append(f"Core {w} must be > 0 (got {val})")
@@ -202,7 +202,7 @@ def show_config(file_path=CURRENT_CFG, title="Active Configuration"):
 
     if cfg.has_section("core"):
         print("[core] - Superscalar Pipeline & Execution Engine")
-        c_type = cfg.get('core', 'type', fallback='OOO_TOMASULO').upper()
+        c_type = cfg.get('core', 'type', fallback='OOO_DYNAMIC').upper()
         print(f"  Module Type:             \033[1;32m{c_type}\033[0m")
         print(f"  Stage Widths (F/D/R/I/C):{cfg.get('core', 'fetch_width', fallback='4')} Fetch / {cfg.get('core', 'decode_width', fallback='4')} Decode / {cfg.get('core', 'rename_width', fallback='4')} Rename / {cfg.get('core', 'issue_width', fallback='4')} Issue / {cfg.get('core', 'commit_width', fallback='4')} Commit")
         print(f"  Reorder Buffer (ROB):    {cfg.get('core', 'rob_size', fallback='64')} entries")

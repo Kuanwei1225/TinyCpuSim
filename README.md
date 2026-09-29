@@ -7,7 +7,7 @@
 
 **TinyCpuSim** is a high-performance, cycle-accurate Out-of-Order (OoO) superscalar CPU simulator and functional ISA emulator for ARMv7-M (Thumb-2) written in modern C++17.
 
-TinyCpuSim provides an end-to-end microarchitectural exploration platform featuring an advanced Tomasulo/ROB execution engine, non-blocking multi-level cache hierarchy with MESI multi-core coherence, Intel/ARM Top-Down microarchitecture analysis (TMAM), 40+ cycle-accurate hardware performance counters, dynamic Region of Interest (ROI) profiling via `m5ops`, and automated golden accuracy calibration against **gem5**.
+TinyCpuSim provides an end-to-end microarchitectural exploration platform featuring an advanced dynamic Out-of-Order (RS/PRF/ROB) superscalar execution engine, non-blocking multi-level cache hierarchy with MESI multi-core coherence, Intel/ARM Top-Down microarchitecture analysis (TMAM), 40+ cycle-accurate hardware performance counters, dynamic Region of Interest (ROI) profiling via `m5ops`, and automated golden accuracy calibration against **gem5**.
 
 ---
 
@@ -40,8 +40,8 @@ TinyCpuSim provides an end-to-end microarchitectural exploration platform featur
 - **Superscalar Out-of-Order Core**:
   - **Branch Prediction Unit (BPU)**: Tournament Predictor, TAGE, GShare, Bimodal, Return Address Stack (RAS), and Branch Target Buffer (BTB).
   - **Frontend & Renaming**: Configurable N-wide superscalar Fetch/Decode/Rename with Physical Register File (PRF), Free Lists, and Speculative RAT checkpoints.
-  - **Age-Ordered Unified Issue Queue**: Priority-based scheduling (oldest instruction first) resolving structural and data hazards.
-  - **Dual Execution Engine**: Full Tomasulo dynamic Out-of-Order scheduling or strict In-Order serialized stall execution (`enable_ooo = false`).
+  - **Age-Ordered Unified Issue Queue / Reservation Station (RS)**: Tag-broadcast wakeup and priority-based scheduling (oldest instruction first) resolving structural and data hazards.
+  - **Dual Execution Engine**: Dynamic Out-of-Order scheduling (`OOO_DYNAMIC`) or strict In-Order serialized stall execution (`enable_ooo = false`).
   - **Pipelined Execution Units**: Pipelined ALUs, Multipliers, Dividers, and Branch Resolution Units.
   - **Load/Store Unit (LSU)**: Load-Store Queue (LSQ) supporting store-to-load forwarding, speculative load bypass, and memory order violation detection.
   - **Reorder Buffer (ROB)**: In-order retirement supporting precise exception recovery and macro-instruction retirement tracking.
@@ -150,7 +150,7 @@ configs/
 ├── current.cfg             # Active simulation configuration (linked/copied from default/)
 ├── all_params_template.cfg # Comprehensive template documenting all knobs
 ├── default/                # Canonical baseline presets
-│   ├── default.cfg             # 4-wide OoO (Tomasulo), TAGE BPU, 32KB L1I/D, 512KB L2
+│   ├── default.cfg             # 4-wide OoO (Dynamic RS/PRF/ROB), TAGE BPU, 32KB L1I/D, 512KB L2
 │   ├── multicore_4core.cfg     # 4 Cores OoO, MESI Cache Coherence, 2MB Shared L2
 │   ├── mem_fast_feeder.cfg     # FAST_FEEDER core + IDEAL BPU + full cache hierarchy (50x fast mem eval)
 │   ├── bpu_standalone.cfg      # FAST_FEEDER core + TAGE BPU + ZERO_LATENCY caches (isolated BPU eval)
@@ -164,7 +164,7 @@ Instead of monolithic binary switches, every subsystem supports pluggable polymo
 
 | Subsystem | Configuration Key | Supported Polymorphic Options | Purpose / Behavior |
 | :--- | :--- | :--- | :--- |
-| **Execution Core** | `core.type` | `OOO_TOMASULO`, `SIMPLE_INORDER`, `FAST_FEEDER` | Full out-of-order execution, strict sequential in-order issue, or high-throughput fast feeder. |
+| **Execution Core** | `core.type` | `OOO_DYNAMIC`, `SIMPLE_INORDER`, `FAST_FEEDER` | Full out-of-order dynamic RS/PRF/ROB execution, strict sequential in-order issue, or high-throughput fast feeder. |
 | **Branch Predictor** | `branch_predictor.type` | `NONE`, `IDEAL`, `BIMODAL`, `GSHARE`, `TAGE` | Hardware branch predictor algorithms or ideal 100% bypass. |
 | **Load/Store Unit** | `lsu.type` | `SPECULATIVE_OOO`, `STRICT_INORDER`, `PASSTHROUGH` | Speculative store forwarding / memory disambiguation, or passthrough. |
 | **Cache Hierarchy** | `cache.type` | `SET_ASSOCIATIVE`, `DIRECT_MAPPED`, `ZERO_LATENCY`, `PASSTHROUGH` | Multi-way set associative, direct mapped, zero-latency hit, or un-cached bypass. |
@@ -176,7 +176,7 @@ Instead of monolithic binary switches, every subsystem supports pluggable polymo
 - **Microarchitecture Dashboard**: Run `./run.sh show` to inspect all 6 hardware subsystems:
   1. Target Workload
   2. Multicore / MESI Coherence / DRAM Latency
-  3. Superscalar Pipeline & Execution Engine (`OOO_TOMASULO`, `SIMPLE_INORDER`, `FAST_FEEDER`)
+  3. Superscalar Pipeline & Execution Engine (`OOO_DYNAMIC`, `SIMPLE_INORDER`, `FAST_FEEDER`)
   4. Branch Prediction Unit (TAGE / BTB / RAS / Ideal)
   5. Load/Store Unit & Memory Disambiguation (`SPECULATIVE_OOO`, `PASSTHROUGH`)
   6. Multi-Level Cache Hierarchy (L1I, L1D, Shared L2, MSHRs)

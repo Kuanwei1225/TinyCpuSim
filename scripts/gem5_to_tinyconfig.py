@@ -136,7 +136,7 @@ dram_latency_cycles = 80
 coherence = MESI
 
 [core]
-type = OOO_TOMASULO
+type = OOO_DYNAMIC
 fetch_width = {extracted_params['fetch_width']}
 decode_width = {extracted_params['decode_width']}
 rename_width = {extracted_params['rename_width']}

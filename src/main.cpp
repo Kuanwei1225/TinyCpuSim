@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
     if (enable_uarch) {
         std::cout << "Microarchitecture Simulation Mode ENABLED\n"
                   << "  Cores: " << uarch_cfg.num_cores
-                  << " | Core: " << (uarch_cfg.default_core.is_ooo() ? "OoO (Tomasulo)" : (uarch_cfg.default_core.is_fast_feeder() ? "Fast Feeder" : "In-Order"))
+                  << " | Core: " << (uarch_cfg.default_core.is_ooo() ? "OoO (Dynamic RS/PRF)" : (uarch_cfg.default_core.is_fast_feeder() ? "Fast Feeder" : "In-Order"))
                   << " | MESI: " << (uarch_cfg.is_mesi_enabled() ? "Enabled" : "Disabled")
                   << " | L1D: " << (uarch_cfg.default_core.l1d.is_active() ? (std::to_string(uarch_cfg.default_core.l1d.size_bytes / 1024) + " KB") : "Passthrough")
                   << " | Shared L2: " << (uarch_cfg.l2_shared.is_active() ? (std::to_string(uarch_cfg.l2_shared.size_bytes / (1024 * 1024)) + " MB") : "Passthrough")

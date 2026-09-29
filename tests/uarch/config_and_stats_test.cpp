@@ -45,7 +45,7 @@ coherence = MESI
 dram_latency = 100
 
 [core]
-type = OOO_TOMASULO
+type = OOO_DYNAMIC
 fetch_width = 8
 rob_size = 128
 rs_size = 64

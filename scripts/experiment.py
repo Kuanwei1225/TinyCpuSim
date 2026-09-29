@@ -21,7 +21,7 @@ PARAM_CATALOG = {
     "core": {
         "description": "Superscalar Out-of-Order Pipeline & Execution Core",
         "params": {
-            "enable_ooo": {"default": "true", "type": "bool", "desc": "Out-of-Order engine (true=OoO Tomasulo/ROB, false=In-Order)"},
+            "enable_ooo": {"default": "true", "type": "bool", "desc": "Out-of-Order engine (true=Dynamic RS/PRF/ROB, false=In-Order)"},
             "fetch_width": {"default": 4, "type": "int", "desc": "Instruction fetch width per cycle"},
             "decode_width": {"default": 4, "type": "int", "desc": "Instruction decode width per cycle"},
             "rename_width": {"default": 4, "type": "int", "desc": "Register renaming width per cycle"},
